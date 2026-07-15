@@ -1,30 +1,19 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
 export const metadata: Metadata = {
-  title: "Online Presence",
-  description: "Online Presence App",
+  title: "Absensi MTS AL-RIYADL",
+  description: "Dashboard Absensi Guru MTS AL-RIYADL",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
-    title: "OnlinePresence",
+    statusBarStyle: "black-translucent",
+    title: "Absensi MTS AL-RIYADL",
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#000000",
+  themeColor: "#1b8659",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -36,10 +25,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
+    <html lang="id">
       <head>
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
       </head>

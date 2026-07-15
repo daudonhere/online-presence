@@ -1,65 +1,44 @@
-import Image from "next/image";
+import Link from "next/link";
+import { QrCode, ScanLine, Pointer } from "lucide-react";
+import { DashboardLayout } from "@/components/layout";
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <DashboardLayout>
+      <section className="w-full max-w-md mx-auto rounded-[34px] bg-white p-5 shadow-soft ring-1 ring-slate-100">
+        <div className="rounded-[30px] bg-gradient-to-br from-[#0c6b46] via-[#1b8659] to-[#075d3d] p-6 text-white overflow-hidden relative min-h-[440px] flex flex-col justify-between">
+          <div className="absolute -right-16 -top-10 h-44 w-44 rounded-bl-[64px] bg-[#ffff00] z-0" />
+          <div className="absolute -left-10 -bottom-10 h-40 w-40 rounded-full bg-[#003d7a]/25" />
+          <div className="absolute right-8 top-8 grid grid-cols-2 gap-1 opacity-80">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <span key={i} className="h-1.5 w-1.5 rounded-full bg-[#ffff00]" />
+            ))}
+          </div>
+
+          <div className="relative flex-1 flex items-center justify-center">
+            <div className="relative h-52 w-52 rounded-[34px] bg-white shadow-card ring-4 ring-[#ffff00]/40 overflow-hidden">
+              <QrCode className="absolute inset-0 w-full h-full text-black" strokeWidth={0.5} />
+            </div>
+          </div>
+
+          <div className="relative mt-8 space-y-3">
+            <Link
+              href="/scan"
+              className="min-h-[58px] w-full rounded-2xl bg-[#ffff00] px-5 py-4 text-center text-base font-black text-[#003d7a] transition hover:scale-[0.98] flex items-center justify-center gap-2 shadow-card"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+              <ScanLine className="text-2xl" />
+              Scan QR
+            </Link>
+            <Link
+              href="/manual"
+              className="min-h-[58px] w-full rounded-2xl bg-white px-5 py-4 text-center text-base font-black text-[#1b8659] transition hover:scale-[0.98] flex items-center justify-center gap-2 shadow-card"
             >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              <Pointer className="text-2xl" />
+              Absen Manual
+            </Link>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      </section>
+    </DashboardLayout>
   );
 }

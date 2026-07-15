@@ -1,26 +1,46 @@
+@import url("https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700&f[]=cabinet-grotesk@500,700,800&display=swap");
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
+  --color-emerald-school: #1b8659;
+  --color-yellow-school: #ffff00;
+  --color-navy-school: #003d7a;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: "Satoshi", sans-serif;
+  --font-display: "Cabinet Grotesk", sans-serif;
+  --shadow-soft: 0 14px 35px rgba(0, 61, 122, 0.10);
+  --shadow-card: 0 10px 24px rgba(15, 23, 42, 0.08);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Satoshi", sans-serif;
+}
+
+@keyframes scan {
+  0%,
+  100% {
+    top: 0;
+  }
+  50% {
+    top: calc(100% - 4px);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
