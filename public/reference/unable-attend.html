@@ -1,0 +1,225 @@
+Page: Halangan Kehadiran
+
+```html
+<!DOCTYPE html><html lang="id"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1b8659">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Absensi MTS AL-RIYADL">
+  <title>Halangan Kehadiran - MTS AL-RIYADL</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700&amp;f[]=cabinet-grotesk@500,700,800&amp;display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            emeraldSchool: '#1b8659',
+            yellowSchool: '#ffff00',
+            navySchool: '#003d7a'
+          },
+          fontFamily: {
+            sans: ['Satoshi', 'sans-serif'],
+            display: ['Cabinet Grotesk', 'sans-serif']
+          },
+          boxShadow: {
+            soft: '0 14px 35px rgba(0, 61, 122, 0.10)',
+            card: '0 10px 24px rgba(15, 23, 42, 0.08)'
+          }
+        }
+      }
+    }
+  </script>
+  <style>sd-component { display: block; }</style>
+  <script src="https://cdn.jsdelivr.net/npm/petite-vue@0.4.1/dist/petite-vue.iife.js" defer init></script>
+</head>
+<body>
+  <div class="w-full h-screen flex flex-col bg-slate-50 text-slate-900 font-sans overflow-hidden" data-sd-id="1">
+    <!-- component: HeaderWithClock (6c08cb8a-6545-475c-8065-3c14777b4e7b) -->
+<div v-scope="{ ...{&quot;greeting&quot;:&quot;Selamat Pagi&quot;,&quot;userName&quot;:&quot;Ibu Titin&quot;,&quot;currentTime&quot;:&quot;07:15:30 WIB&quot;}, $emit() {} }">
+<header class="shrink-0 sticky top-0 z-40 pt-14 bg-gradient-to-br from-[#1b8659] via-[#12764d] to-[#075d3d] text-white overflow-hidden">
+  <div class="absolute -right-10 -top-6 h-32 w-32 rounded-bl-[44px] bg-[#ffff00]"></div>
+  <div class="absolute right-7 top-20 grid grid-cols-2 gap-1 opacity-70">
+    <span class="h-1.5 w-1.5 rounded-full bg-[#ffff00]"></span>
+    <span class="h-1.5 w-1.5 rounded-full bg-[#ffff00]"></span>
+    <span class="h-1.5 w-1.5 rounded-full bg-[#ffff00]"></span>
+    <span class="h-1.5 w-1.5 rounded-full bg-[#ffff00]"></span>
+    <span class="h-1.5 w-1.5 rounded-full bg-[#ffff00]"></span>
+    <span class="h-1.5 w-1.5 rounded-full bg-[#ffff00]"></span>
+    <span class="h-1.5 w-1.5 rounded-full bg-[#ffff00]"></span>
+    <span class="h-1.5 w-1.5 rounded-full bg-[#ffff00]"></span>
+  </div>
+  <div class="relative px-5 pb-5">
+    <div class="flex items-center justify-between gap-4">
+      <div>
+        <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/80">
+          <span class="h-2 w-2 rounded-full bg-[#ffff00]"></span>
+          MTS AL-RIYADL
+        </div>
+        <h1 class="mt-2 font-display text-2xl font-bold tracking-tight">{{ greeting }}, {{ userName }}</h1>
+        <div class="mt-2 flex items-center gap-2 text-sm font-medium text-white/90">
+          <iconify-icon icon="lucide:clock-3" class="text-lg text-[#ffff00]"></iconify-icon>
+          <span>{{ currentTime }}</span>
+        </div>
+      </div>
+      <button 
+        @click="$emit('notificationClick')"
+        class="min-h-[44px] min-w-[44px] rounded-2xl bg-white/15 flex items-center justify-center ring-1 ring-white/20 transition hover:bg-white/25" 
+        aria-label="Notifikasi"
+      >
+        <iconify-icon icon="lucide:bell" class="text-xl text-white"></iconify-icon>
+      </button>
+    </div>
+  </div>
+</header>
+</div>
+<!-- /component: HeaderWithClock (6c08cb8a-6545-475c-8065-3c14777b4e7b) -->
+
+    <main class="flex-1 overflow-y-auto px-5 pt-5 pb-28" data-sd-id="2">
+      <section class="relative overflow-hidden rounded-[34px] bg-gradient-to-br from-[#0c6b46] via-emeraldSchool to-[#075d3d] p-5 text-white shadow-soft" data-sd-id="3">
+        <div class="absolute -right-12 -top-10 h-36 w-36 rounded-bl-[58px] bg-yellowSchool" data-sd-id="4"></div>
+        <div class="absolute -left-12 -bottom-14 h-36 w-36 rounded-full bg-navySchool/25" data-sd-id="5"></div>
+        <div class="absolute right-8 bottom-8 grid grid-cols-2 gap-1 opacity-80" data-sd-id="6">
+          <span class="h-1.5 w-1.5 rounded-full bg-yellowSchool" data-sd-id="7"></span><span class="h-1.5 w-1.5 rounded-full bg-yellowSchool" data-sd-id="8"></span>
+          <span class="h-1.5 w-1.5 rounded-full bg-yellowSchool" data-sd-id="9"></span><span class="h-1.5 w-1.5 rounded-full bg-yellowSchool" data-sd-id="10"></span>
+          <span class="h-1.5 w-1.5 rounded-full bg-yellowSchool" data-sd-id="11"></span><span class="h-1.5 w-1.5 rounded-full bg-yellowSchool" data-sd-id="12"></span>
+          <span class="h-1.5 w-1.5 rounded-full bg-yellowSchool" data-sd-id="13"></span><span class="h-1.5 w-1.5 rounded-full bg-yellowSchool" data-sd-id="14"></span>
+        </div>
+
+        <div class="relative" data-sd-id="15">
+          <div class="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-white/90 ring-1 ring-white/15" data-sd-id="16">
+            <span class="h-2 w-2 rounded-full bg-yellowSchool" data-sd-id="17"></span>
+            Menu Halangan
+          </div>
+          <div class="mt-6 flex items-end justify-between gap-4" data-sd-id="18">
+            <div data-sd-id="19">
+              <h1 class="font-display text-4xl font-bold leading-none tracking-tight" data-sd-id="20">Halangan Kehadiran</h1>
+              <p class="mt-3 max-w-[230px] text-sm leading-relaxed text-white/82" data-sd-id="21">Ajukan keterangan ketidakhadiran guru sesuai kategori dan unggah bukti bila diperlukan.</p>
+            </div>
+            <div class="shrink-0 h-20 w-20 rounded-[26px] bg-white flex items-center justify-center shadow-card ring-4 ring-yellowSchool/40" data-sd-id="22">
+              <iconify-icon icon="lucide:file-clock" class="text-5xl text-emeraldSchool"></iconify-icon>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="mt-5 rounded-[30px] bg-white p-4 shadow-card ring-1 ring-slate-100" data-sd-id="23">
+        <div class="flex items-center justify-between gap-3" data-sd-id="24">
+          <div data-sd-id="25">
+            <h2 class="font-display text-2xl font-bold tracking-tight text-slate-950" data-sd-id="26">Pilih Kategori</h2>
+            <p class="mt-1 text-sm leading-relaxed text-slate-500" data-sd-id="27">Ketuk salah satu kartu untuk membuka form pengajuan.</p>
+          </div>
+          <div class="h-11 w-11 rounded-2xl bg-emerald-50 flex items-center justify-center" data-sd-id="28">
+            <iconify-icon icon="lucide:list-checks" class="text-2xl text-emeraldSchool"></iconify-icon>
+          </div>
+        </div>
+
+        <div class="mt-4 grid grid-cols-1 gap-3" data-sd-id="29">
+          <a id="kategori-sakit-link" href="https://draft-ea42c68c-cc1f-4211-a3be-717a77bf5754.preview.superdesign.dev" class="group min-h-[94px] rounded-[26px] bg-emerald-50 p-4 ring-1 ring-emerald-100 transition hover:scale-[0.99] hover:bg-emerald-100 flex items-center gap-4" data-sd-id="30">
+            <div class="h-14 w-14 rounded-2xl bg-emeraldSchool flex items-center justify-center shadow-card" data-sd-id="31">
+              <iconify-icon icon="lucide:thermometer" class="text-3xl text-yellowSchool"></iconify-icon>
+            </div>
+            <div class="flex-1" data-sd-id="32">
+              <h3 class="font-display text-xl font-bold tracking-tight text-slate-950" data-sd-id="33">Sakit</h3>
+              <p class="mt-1 text-sm leading-snug text-slate-500" data-sd-id="34">Ajukan izin sakit dengan surat dokter atau bukti pendukung.</p>
+            </div>
+            <iconify-icon icon="lucide:chevron-right" class="text-2xl text-emeraldSchool transition group-hover:translate-x-0.5"></iconify-icon>
+          </a>
+
+          <a id="kategori-izin-link" href="https://draft-ea42c68c-cc1f-4211-a3be-717a77bf5754.preview.superdesign.dev" class="group min-h-[94px] rounded-[26px] bg-yellow-50 p-4 ring-1 ring-yellow-100 transition hover:scale-[0.99] hover:bg-yellow-100 flex items-center gap-4" data-sd-id="35">
+            <div class="h-14 w-14 rounded-2xl bg-yellowSchool flex items-center justify-center shadow-card" data-sd-id="36">
+              <iconify-icon icon="lucide:clipboard-pen" class="text-3xl text-navySchool"></iconify-icon>
+            </div>
+            <div class="flex-1" data-sd-id="37">
+              <h3 class="font-display text-xl font-bold tracking-tight text-slate-950" data-sd-id="38">Izin</h3>
+              <p class="mt-1 text-sm leading-snug text-slate-500" data-sd-id="39">Ajukan izin pribadi, keluarga, atau keperluan resmi sekolah.</p>
+            </div>
+            <iconify-icon icon="lucide:chevron-right" class="text-2xl text-amber-500 transition group-hover:translate-x-0.5"></iconify-icon>
+          </a>
+
+          <a id="kategori-tanpa-keterangan-link" href="https://draft-ea42c68c-cc1f-4211-a3be-717a77bf5754.preview.superdesign.dev" class="group min-h-[94px] rounded-[26px] bg-slate-100 p-4 ring-1 ring-slate-200 transition hover:scale-[0.99] hover:bg-slate-200 flex items-center gap-4" data-sd-id="40">
+            <div class="h-14 w-14 rounded-2xl bg-slate-800 flex items-center justify-center shadow-card" data-sd-id="41">
+              <iconify-icon icon="lucide:circle-help" class="text-3xl text-yellowSchool"></iconify-icon>
+            </div>
+            <div class="flex-1" data-sd-id="42">
+              <h3 class="font-display text-xl font-bold tracking-tight text-slate-950" data-sd-id="43">Tanpa Keterangan</h3>
+              <p class="mt-1 text-sm leading-snug text-slate-500" data-sd-id="44">Laporkan ketidakhadiran yang belum memiliki dokumen alasan.</p>
+            </div>
+            <iconify-icon icon="lucide:chevron-right" class="text-2xl text-slate-500 transition group-hover:translate-x-0.5"></iconify-icon>
+          </a>
+
+          <a id="kategori-cuti-link" href="https://draft-ea42c68c-cc1f-4211-a3be-717a77bf5754.preview.superdesign.dev" class="group min-h-[94px] rounded-[26px] bg-blue-50 p-4 ring-1 ring-blue-100 transition hover:scale-[0.99] hover:bg-blue-100 flex items-center gap-4" data-sd-id="45">
+            <div class="h-14 w-14 rounded-2xl bg-navySchool flex items-center justify-center shadow-card" data-sd-id="46">
+              <iconify-icon icon="lucide:calendar-days" class="text-3xl text-yellowSchool"></iconify-icon>
+            </div>
+            <div class="flex-1" data-sd-id="47">
+              <h3 class="font-display text-xl font-bold tracking-tight text-slate-950" data-sd-id="48">Cuti</h3>
+              <p class="mt-1 text-sm leading-snug text-slate-500" data-sd-id="49">Ajukan cuti sesuai periode dan ketentuan madrasah.</p>
+            </div>
+            <iconify-icon icon="lucide:chevron-right" class="text-2xl text-navySchool transition group-hover:translate-x-0.5"></iconify-icon>
+          </a>
+        </div>
+      </section>
+
+      <section class="mt-4 rounded-[28px] bg-white p-4 shadow-card ring-1 ring-slate-100" data-sd-id="50">
+        <div class="flex items-center gap-3" data-sd-id="51">
+          <div class="h-12 w-12 rounded-2xl bg-emeraldSchool flex items-center justify-center" data-sd-id="52">
+            <iconify-icon icon="lucide:info" class="text-2xl text-yellowSchool"></iconify-icon>
+          </div>
+          <div data-sd-id="53">
+            <h2 class="font-display text-lg font-bold tracking-tight text-slate-950" data-sd-id="54">Catatan Pengajuan</h2>
+            <p class="mt-1 text-sm leading-relaxed text-slate-500" data-sd-id="55">Pengajuan akan diverifikasi oleh admin madrasah sebelum masuk ke laporan absensi.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- component: BottomNavigation (fd406ad5-cb40-447a-b29f-caa71121395d) -->
+<div v-scope="{ ...{&quot;activeItem&quot;:&quot;absensi&quot;,&quot;absensiHref&quot;:&quot;#absensi&quot;,&quot;halanganHref&quot;:&quot;#halangan&quot;,&quot;analisaHref&quot;:&quot;#analisa&quot;,&quot;laporanHref&quot;:&quot;#laporan-nav&quot;,&quot;pengaturanHref&quot;:&quot;#pengaturan-nav&quot;}, $emit() {} }">
+<footer class="shrink-0 fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 pb-[34px]">
+  <nav class="grid grid-cols-5 px-2 pt-2" aria-label="Navigasi utama">
+    <a :href="absensiHref" class="min-h-[56px] rounded-2xl flex flex-col items-center justify-center gap-1" :class="activeItem === 'absensi' ? 'bg-emeraldSchool text-yellowSchool' : 'text-slate-400 transition hover:text-emeraldSchool'">
+      <iconify-icon icon="lucide:qr-code" class="text-xl"></iconify-icon>
+      <span class="text-[11px]" :class="activeItem === 'absensi' ? 'font-bold' : 'font-semibold'">Absensi</span>
+    </a>
+    <a :href="halanganHref" class="min-h-[56px] rounded-2xl flex flex-col items-center justify-center gap-1" :class="activeItem === 'halangan' ? 'bg-emeraldSchool text-yellowSchool' : 'text-slate-400 transition hover:text-emeraldSchool'">
+      <iconify-icon icon="lucide:file-clock" class="text-xl"></iconify-icon>
+      <span class="text-[11px]" :class="activeItem === 'halangan' ? 'font-bold' : 'font-semibold'">Halangan</span>
+    </a>
+    <a :href="analisaHref" class="min-h-[56px] rounded-2xl flex flex-col items-center justify-center gap-1" :class="activeItem === 'analisa' ? 'bg-emeraldSchool text-yellowSchool' : 'text-slate-400 transition hover:text-emeraldSchool'">
+      <iconify-icon icon="lucide:bar-chart-3" class="text-xl"></iconify-icon>
+      <span class="text-[11px]" :class="activeItem === 'analisa' ? 'font-bold' : 'font-semibold'">Analisa</span>
+    </a>
+    <a :href="laporanHref" class="min-h-[56px] rounded-2xl flex flex-col items-center justify-center gap-1" :class="activeItem === 'laporan' ? 'bg-emeraldSchool text-yellowSchool' : 'text-slate-400 transition hover:text-emeraldSchool'">
+      <iconify-icon icon="lucide:file-down" class="text-xl"></iconify-icon>
+      <span class="text-[11px]" :class="activeItem === 'laporan' ? 'font-bold' : 'font-semibold'">Laporan</span>
+    </a>
+    <a :href="pengaturanHref" class="min-h-[56px] rounded-2xl flex flex-col items-center justify-center gap-1" :class="activeItem === 'pengaturan' ? 'bg-emeraldSchool text-yellowSchool' : 'text-slate-400 transition hover:text-emeraldSchool'">
+      <iconify-icon icon="lucide:user-cog" class="text-xl"></iconify-icon>
+      <span class="text-[11px]" :class="activeItem === 'pengaturan' ? 'font-bold' : 'font-semibold'">Atur</span>
+    </a>
+  </nav>
+</footer>
+</div>
+<!-- /component: BottomNavigation (fd406ad5-cb40-447a-b29f-caa71121395d) -->
+  </div>
+
+  <script>
+    function updateClock() {
+      const el = document.getElementById('digitalClock');
+      const now = new Date();
+      const time = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      if (el) el.textContent = time + ' WIB';
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+  </script>
+
+</body></html>
+```
+
+Please reference this design and implement it into our codebase; Try to understand the structure, which part of our codebase is relevant and implement
+

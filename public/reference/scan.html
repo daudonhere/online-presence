@@ -1,0 +1,215 @@
+Page: Scan QR Code Absensi
+
+```html
+<!DOCTYPE html><html lang="id"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1b8659">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Absensi MTS AL-RIYADL">
+  <title>Scan QR Code Absensi - MTS AL-RIYADL</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://code.iconify.design/iconify-icon/1.0.7/iconify-icon.min.js"></script>
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700&amp;f[]=cabinet-grotesk@500,700,800&amp;display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            emeraldSchool: '#1b8659',
+            yellowSchool: '#ffff00',
+            navySchool: '#003d7a'
+          },
+          fontFamily: {
+            sans: ['Satoshi', 'sans-serif'],
+            display: ['Cabinet Grotesk', 'sans-serif']
+          },
+          boxShadow: {
+            soft: '0 14px 35px rgba(0, 61, 122, 0.10)',
+            card: '0 10px 24px rgba(15, 23, 42, 0.08)'
+          },
+          keyframes: {
+            scan: {
+              '0%, 100%': { transform: 'translateY(0)' },
+              '50%': { transform: 'translateY(220px)' }
+            },
+            pulseRing: {
+              '0%, 100%': { opacity: '0.55', transform: 'scale(1)' },
+              '50%': { opacity: '1', transform: 'scale(1.025)' }
+            }
+          },
+          animation: {
+            scan: 'scan 2.2s ease-in-out infinite',
+            pulseRing: 'pulseRing 1.8s ease-in-out infinite'
+          }
+        }
+      }
+    }
+  </script>
+  <style>sd-component { display: block; }</style>
+  <script src="https://cdn.jsdelivr.net/npm/petite-vue@0.4.1/dist/petite-vue.iife.js" defer init></script>
+</head>
+<body>
+  <div class="w-full h-screen flex flex-col bg-slate-50 text-slate-900 font-sans overflow-hidden" data-sd-id="1">
+    <!-- component: HeaderWithClock (6c08cb8a-6545-475c-8065-3c14777b4e7b) -->
+<div v-scope="{ ...{&quot;greeting&quot;:&quot;Selamat Pagi&quot;,&quot;userName&quot;:&quot;Ibu Titin&quot;,&quot;currentTime&quot;:&quot;07:15:30 WIB&quot;}, $emit() {} }">
+<header class="shrink-0 sticky top-0 z-40 pt-14 bg-gradient-to-br from-[#1b8659] via-[#12764d] to-[#075d3d] text-white overflow-hidden">
+  <div class="absolute -right-10 -top-6 h-32 w-32 rounded-bl-[44px] bg-[#ffff00]"></div>
+  <div class="absolute right-7 top-20 grid grid-cols-2 gap-1 opacity-70">
+    <span class="h-1.5 w-1.5 rounded-full bg-[#ffff00]"></span>
+    <span class="h-1.5 w-1.5 rounded-full bg-[#ffff00]"></span>
+    <span class="h-1.5 w-1.5 rounded-full bg-[#ffff00]"></span>
+    <span class="h-1.5 w-1.5 rounded-full bg-[#ffff00]"></span>
+    <span class="h-1.5 w-1.5 rounded-full bg-[#ffff00]"></span>
+    <span class="h-1.5 w-1.5 rounded-full bg-[#ffff00]"></span>
+    <span class="h-1.5 w-1.5 rounded-full bg-[#ffff00]"></span>
+    <span class="h-1.5 w-1.5 rounded-full bg-[#ffff00]"></span>
+  </div>
+  <div class="relative px-5 pb-5">
+    <div class="flex items-center justify-between gap-4">
+      <div>
+        <div class="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-white/80">
+          <span class="h-2 w-2 rounded-full bg-[#ffff00]"></span>
+          MTS AL-RIYADL
+        </div>
+        <h1 class="mt-2 font-display text-2xl font-bold tracking-tight">{{ greeting }}, {{ userName }}</h1>
+        <div class="mt-2 flex items-center gap-2 text-sm font-medium text-white/90">
+          <iconify-icon icon="lucide:clock-3" class="text-lg text-[#ffff00]"></iconify-icon>
+          <span>{{ currentTime }}</span>
+        </div>
+      </div>
+      <button 
+        @click="$emit('notificationClick')"
+        class="min-h-[44px] min-w-[44px] rounded-2xl bg-white/15 flex items-center justify-center ring-1 ring-white/20 transition hover:bg-white/25" 
+        aria-label="Notifikasi"
+      >
+        <iconify-icon icon="lucide:bell" class="text-xl text-white"></iconify-icon>
+      </button>
+    </div>
+  </div>
+</header>
+</div>
+<!-- /component: HeaderWithClock (6c08cb8a-6545-475c-8065-3c14777b4e7b) -->
+
+    <main class="flex-1 overflow-y-auto px-5 pt-5 pb-28" data-sd-id="2">
+      <section class="w-full rounded-[34px] bg-white p-4 shadow-soft ring-1 ring-slate-100" data-sd-id="3">
+        <div class="rounded-[30px] bg-gradient-to-br from-[#0c6b46] via-emeraldSchool to-[#075d3d] p-5 text-white overflow-hidden relative" data-sd-id="4">
+          <div class="absolute -right-16 -top-10 h-44 w-44 rounded-bl-[64px] bg-yellowSchool" data-sd-id="5"></div>
+          <div class="absolute -left-12 -bottom-12 h-40 w-40 rounded-full bg-navySchool/25" data-sd-id="6"></div>
+          <div class="absolute right-6 top-24 grid grid-cols-2 gap-1 opacity-80" data-sd-id="7">
+            <span class="h-1.5 w-1.5 rounded-full bg-yellowSchool" data-sd-id="8"></span><span class="h-1.5 w-1.5 rounded-full bg-yellowSchool" data-sd-id="9"></span>
+            <span class="h-1.5 w-1.5 rounded-full bg-yellowSchool" data-sd-id="10"></span><span class="h-1.5 w-1.5 rounded-full bg-yellowSchool" data-sd-id="11"></span>
+            <span class="h-1.5 w-1.5 rounded-full bg-yellowSchool" data-sd-id="12"></span><span class="h-1.5 w-1.5 rounded-full bg-yellowSchool" data-sd-id="13"></span>
+            <span class="h-1.5 w-1.5 rounded-full bg-yellowSchool" data-sd-id="14"></span><span class="h-1.5 w-1.5 rounded-full bg-yellowSchool" data-sd-id="15"></span>
+          </div>
+
+          <div class="relative flex items-center justify-between gap-3" data-sd-id="16">
+            <a id="back-to-absensi-link" href="https://draft-53419364-8784-4149-9afc-34037d77dd07.preview.superdesign.dev" class="min-h-[44px] min-w-[44px] rounded-2xl bg-white/15 flex items-center justify-center ring-1 ring-white/20 transition hover:bg-white/25" aria-label="Kembali ke halaman absensi" data-sd-id="17">
+              <iconify-icon icon="lucide:arrow-left" class="text-xl text-white"></iconify-icon>
+            </a>
+            <div class="flex-1" data-sd-id="18">
+              <div class="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-white/90 ring-1 ring-white/15" data-sd-id="19">
+                <span class="h-2 w-2 rounded-full bg-yellowSchool" data-sd-id="20"></span>
+                Pemindai QR
+              </div>
+              <h1 class="mt-3 font-display text-3xl font-bold tracking-tight" data-sd-id="21">Scan QR Code Absensi</h1>
+            </div>
+          </div>
+
+          <div class="relative mt-6 rounded-[28px] bg-slate-950/40 p-3 ring-1 ring-white/15 shadow-card" data-sd-id="22">
+            <div class="relative h-[286px] overflow-hidden rounded-[22px] bg-gradient-to-br from-slate-900 via-[#0b3f2d] to-navySchool" data-sd-id="23">
+              <div class="absolute inset-0 opacity-30" data-sd-id="24">
+                <div class="h-full w-full bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,0,0.28),transparent_32%),radial-gradient(circle_at_80%_80%,rgba(27,134,89,0.45),transparent_34%)]" data-sd-id="25"></div>
+              </div>
+              <div class="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-white/10 to-transparent" data-sd-id="26"></div>
+              <div class="absolute inset-0 flex items-center justify-center" data-sd-id="27">
+                <div class="relative h-[230px] w-[230px] animate-pulseRing" data-sd-id="28">
+                  <div class="absolute left-0 top-0 h-12 w-12 rounded-tl-3xl border-l-4 border-t-4 border-yellowSchool" data-sd-id="29"></div>
+                  <div class="absolute right-0 top-0 h-12 w-12 rounded-tr-3xl border-r-4 border-t-4 border-yellowSchool" data-sd-id="30"></div>
+                  <div class="absolute bottom-0 left-0 h-12 w-12 rounded-bl-3xl border-b-4 border-l-4 border-yellowSchool" data-sd-id="31"></div>
+                  <div class="absolute bottom-0 right-0 h-12 w-12 rounded-br-3xl border-b-4 border-r-4 border-yellowSchool" data-sd-id="32"></div>
+                  <div class="absolute left-3 right-3 top-0 h-0.5 animate-scan bg-yellowSchool shadow-[0_0_24px_rgba(255,255,0,0.95)]" data-sd-id="33"></div>
+                  <div class="absolute inset-8 flex items-center justify-center rounded-3xl bg-white/5 ring-1 ring-white/10" data-sd-id="34">
+                    <iconify-icon icon="lucide:qr-code" class="text-7xl text-white/35"></iconify-icon>
+                  </div>
+                </div>
+              </div>
+              <div class="absolute bottom-4 left-4 right-4 rounded-2xl bg-black/35 px-4 py-3 text-center ring-1 ring-white/10" data-sd-id="35">
+                <p class="text-sm font-semibold text-white" data-sd-id="36">Arahkan kamera ke QR sekolah</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="relative mt-5 rounded-3xl bg-white/12 p-4 ring-1 ring-white/15" data-sd-id="37">
+            <div class="flex items-start gap-3" data-sd-id="38">
+              <div class="h-11 w-11 shrink-0 rounded-2xl bg-yellowSchool flex items-center justify-center" data-sd-id="39">
+                <iconify-icon icon="lucide:info" class="text-xl text-navySchool"></iconify-icon>
+              </div>
+              <div data-sd-id="40">
+                <h2 class="font-display text-xl font-bold tracking-tight" data-sd-id="41">Instruksi</h2>
+                <p class="mt-1 text-sm leading-relaxed text-white/80" data-sd-id="42">Pastikan QR Code terlihat jelas, berada di dalam bingkai, dan koneksi internet aktif sebelum mengirim absensi.</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="relative mt-5 space-y-3" data-sd-id="43">
+            <a id="submit-qr-attendance-link" href="https://draft-53419364-8784-4149-9afc-34037d77dd07.preview.superdesign.dev" class="min-h-[58px] w-full rounded-2xl bg-yellowSchool px-5 py-4 text-center text-base font-black text-navySchool transition hover:scale-[0.98] flex items-center justify-center gap-2 shadow-card" data-sd-id="44">
+              <iconify-icon icon="lucide:check-circle-2" class="text-2xl"></iconify-icon>
+              Kirim Absensi
+            </a>
+            <a id="manual-attendance-link" href="https://draft-48205d48-9e41-4136-b44d-d1ae365670aa.preview.superdesign.dev" class="min-h-[54px] w-full rounded-2xl bg-white px-5 py-4 text-center text-sm font-black text-emeraldSchool transition hover:scale-[0.98] flex items-center justify-center gap-2 shadow-card" data-sd-id="45">
+              <iconify-icon icon="lucide:hand-pointer" class="text-xl"></iconify-icon>
+              Gunakan Absen Manual
+            </a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- component: BottomNavigation (fd406ad5-cb40-447a-b29f-caa71121395d) -->
+<div v-scope="{ ...{&quot;activeItem&quot;:&quot;absensi&quot;,&quot;absensiHref&quot;:&quot;#absensi&quot;,&quot;halanganHref&quot;:&quot;#halangan&quot;,&quot;analisaHref&quot;:&quot;#analisa&quot;,&quot;laporanHref&quot;:&quot;#laporan-nav&quot;,&quot;pengaturanHref&quot;:&quot;#pengaturan-nav&quot;}, $emit() {} }">
+<footer class="shrink-0 fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 pb-[34px]">
+  <nav class="grid grid-cols-5 px-2 pt-2" aria-label="Navigasi utama">
+    <a :href="absensiHref" class="min-h-[56px] rounded-2xl flex flex-col items-center justify-center gap-1" :class="activeItem === 'absensi' ? 'bg-emeraldSchool text-yellowSchool' : 'text-slate-400 transition hover:text-emeraldSchool'">
+      <iconify-icon icon="lucide:qr-code" class="text-xl"></iconify-icon>
+      <span class="text-[11px]" :class="activeItem === 'absensi' ? 'font-bold' : 'font-semibold'">Absensi</span>
+    </a>
+    <a :href="halanganHref" class="min-h-[56px] rounded-2xl flex flex-col items-center justify-center gap-1" :class="activeItem === 'halangan' ? 'bg-emeraldSchool text-yellowSchool' : 'text-slate-400 transition hover:text-emeraldSchool'">
+      <iconify-icon icon="lucide:file-clock" class="text-xl"></iconify-icon>
+      <span class="text-[11px]" :class="activeItem === 'halangan' ? 'font-bold' : 'font-semibold'">Halangan</span>
+    </a>
+    <a :href="analisaHref" class="min-h-[56px] rounded-2xl flex flex-col items-center justify-center gap-1" :class="activeItem === 'analisa' ? 'bg-emeraldSchool text-yellowSchool' : 'text-slate-400 transition hover:text-emeraldSchool'">
+      <iconify-icon icon="lucide:bar-chart-3" class="text-xl"></iconify-icon>
+      <span class="text-[11px]" :class="activeItem === 'analisa' ? 'font-bold' : 'font-semibold'">Analisa</span>
+    </a>
+    <a :href="laporanHref" class="min-h-[56px] rounded-2xl flex flex-col items-center justify-center gap-1" :class="activeItem === 'laporan' ? 'bg-emeraldSchool text-yellowSchool' : 'text-slate-400 transition hover:text-emeraldSchool'">
+      <iconify-icon icon="lucide:file-down" class="text-xl"></iconify-icon>
+      <span class="text-[11px]" :class="activeItem === 'laporan' ? 'font-bold' : 'font-semibold'">Laporan</span>
+    </a>
+    <a :href="pengaturanHref" class="min-h-[56px] rounded-2xl flex flex-col items-center justify-center gap-1" :class="activeItem === 'pengaturan' ? 'bg-emeraldSchool text-yellowSchool' : 'text-slate-400 transition hover:text-emeraldSchool'">
+      <iconify-icon icon="lucide:user-cog" class="text-xl"></iconify-icon>
+      <span class="text-[11px]" :class="activeItem === 'pengaturan' ? 'font-bold' : 'font-semibold'">Atur</span>
+    </a>
+  </nav>
+</footer>
+</div>
+<!-- /component: BottomNavigation (fd406ad5-cb40-447a-b29f-caa71121395d) -->
+  </div>
+
+  <script>
+    function updateClock() {
+      const el = document.getElementById('digitalClock');
+      const now = new Date();
+      const time = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      if (el) el.textContent = time + ' WIB';
+    }
+    updateClock();
+    setInterval(updateClock, 1000);
+  </script>
+
+</body></html>
+```
+
+Please reference this design and implement it into our codebase; Try to understand the structure, which part of our codebase is relevant and implement
+
