@@ -1,8 +1,5 @@
-import { mkdir, writeFile } from "fs/promises";
-import { join } from "path";
 import { randomUUID } from "crypto";
-
-const UPLOAD_DIR = join(process.cwd(), "public", "uploads");
+import { supabase } from "./supabase";
 
 const ALLOWED_TYPES: Record<string, string[]> = {
   avatars: ["image/jpeg", "image/png"],
@@ -80,13 +77,17 @@ export async function saveFile(
   };
 
   const ext = mimeToExt[detectedMime] || getExtension(file.name);
-  const dir = join(UPLOAD_DIR, folder);
-  await mkdir(dir, { recursive: true });
-
   const filename = `${randomUUID()}.${ext}`;
-  const filepath = join(dir, filename);
 
-  await writeFile(filepath, buffer);
+  const { error } = await supabase.storage
+    .from(folder)
+    .upload(filename, buffer, { contentType: detectedMime });
 
-  return `/uploads/${folder}/${filename}`;
+  if (error) {
+    throw new UploadError("Gagal upload file ke server", 500);
+  }
+
+  const { data } = supabase.storage.from(folder).getPublicUrl(filename);
+
+  return data.publicUrl;
 }
