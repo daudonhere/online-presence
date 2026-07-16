@@ -1,10 +1,13 @@
 "use client";
 
-import { ArrowLeft, ShieldCheck, CalendarDays, Info, UploadCloud, Send } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Info, UploadCloud, Send, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { DashboardLayout } from "@/components/layout";
+import { DatePicker } from "@/components/ui/DatePicker";
+import { useFormValidation, FieldError } from "@/lib/hooks";
+import { obstacleSchema } from "@/lib/validations";
 
 const categoryConfig: Record<string, { title: string; placeholder: string; uploadText: string }> = {
   sakit: {
@@ -36,14 +39,78 @@ export default function HalanganFormPage() {
   const config = categoryConfig[category] || categoryConfig.sakit;
 
   const [date, setDate] = useState("");
+  const today = new Date().toISOString().split("T")[0];
   const [reason, setReason] = useState("");
   const [charCount, setCharCount] = useState(0);
   const [confirmed, setConfirmed] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+  const { errors, validate, clearField } = useFormValidation(obstacleSchema);
 
   const handleReasonChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value.slice(0, 250);
     setReason(val);
     setCharCount(val.length);
+    clearField("reason");
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files?.[0] || null;
+    setFile(selected);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(false);
+
+    if (!validate({ date, category, reason })) {
+      return;
+    }
+
+    if (!confirmed) {
+      setError("Konfirmasi data wajib dicentang.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append("date", date);
+      formData.append("category", category);
+      formData.append("reason", reason);
+      if (file) {
+        formData.append("file", file);
+      }
+
+      const res = await fetch("/api/obstacles", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Gagal mengirim pengajuan.");
+      }
+
+      setSuccess(true);
+      setDate("");
+      setReason("");
+      setCharCount(0);
+      setConfirmed(false);
+      setFile(null);
+
+      const fileInput = document.getElementById("file-bukti") as HTMLInputElement | null;
+      if (fileInput) fileInput.value = "";
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Terjadi kesalahan. Silakan coba lagi.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -86,28 +153,40 @@ export default function HalanganFormPage() {
           </div>
         </div>
 
-        <form className="mt-5 space-y-5" onSubmit={(e) => e.preventDefault()}>
+        {success && (
+          <div className="mt-4 rounded-2xl bg-emerald-50 p-4 ring-1 ring-emerald-200">
+            <p className="text-sm font-bold text-emerald-700">Pengajuan berhasil dikirim!</p>
+            <p className="mt-1 text-xs text-emerald-600">
+              Data Anda telah diterima dan menunggu persetujuan admin.
+            </p>
+          </div>
+        )}
+
+        {error && (
+          <div className="mt-4 rounded-2xl bg-red-50 p-4 ring-1 ring-red-200">
+            <p className="text-sm font-bold text-red-700">{error}</p>
+          </div>
+        )}
+
+        <form className="mt-5 space-y-5" onSubmit={handleSubmit}>
           <div>
             <label htmlFor="tanggal-kejadian" className="flex items-center justify-between text-sm font-bold text-slate-900">
               <span>Tanggal Kejadian</span>
               <span className="text-xs font-semibold text-red-500">Wajib</span>
             </label>
-            <div className="mt-2 relative">
-              <input
-                id="tanggal-kejadian"
-                name="tanggal-kejadian"
-                type="date"
-                required
+            <div className="mt-2">
+              <DatePicker
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="min-h-[54px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 pr-12 text-base font-semibold text-slate-900 outline-none transition focus:border-[#1b8659] focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                onChange={(v) => { setDate(v); clearField("date"); }}
+                minDate={today}
+                placeholder="Pilih tanggal kejadian"
               />
-              <CalendarDays className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xl text-[#1b8659]" />
             </div>
             <p className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-500">
               <Info className="text-sm text-[#1b8659]" />
               Pilih tanggal saat Bapak/Ibu tidak dapat hadir.
             </p>
+            <FieldError error={errors.date} />
           </div>
 
           <div>
@@ -144,6 +223,7 @@ export default function HalanganFormPage() {
               <span>Minimal tuliskan alasan yang jelas.</span>
               <span>{charCount}/250</span>
             </div>
+            <FieldError error={errors.reason} />
           </div>
 
           <div>
@@ -159,7 +239,11 @@ export default function HalanganFormPage() {
                 <UploadCloud className="text-2xl text-[#1b8659]" />
               </div>
               <p className="mt-3 text-sm font-bold text-slate-900">{config.uploadText}</p>
-              <p className="mt-1 text-xs text-slate-500">PDF, JPG, PNG maksimal 1 MB</p>
+              {file ? (
+                <p className="mt-1 text-xs font-semibold text-[#1b8659]">{file.name}</p>
+              ) : (
+                <p className="mt-1 text-xs text-slate-500">PDF, JPG, PNG maksimal 1 MB</p>
+              )}
             </label>
             <input
               id="file-bukti"
@@ -167,6 +251,7 @@ export default function HalanganFormPage() {
               type="file"
               accept=".pdf,.jpg,.jpeg,.png"
               className="sr-only"
+              onChange={handleFileChange}
             />
           </div>
 
@@ -183,17 +268,28 @@ export default function HalanganFormPage() {
               />
               <label htmlFor="konfirmasi-data" className="text-sm leading-relaxed text-slate-600">
                 Saya menyatakan data yang dikirim benar dan dapat
-                dipertanggungjawabkan kepada pihak MTS AL-RIYADL.
+                dipertanggungjawabkan. Pengajuan ini akan diverifikasi
+                oleh admin sebelum disetujui.
               </label>
             </div>
           </div>
 
           <button
             type="submit"
-            className="min-h-[58px] w-full rounded-2xl bg-[#ffff00] px-5 py-4 text-base font-black text-[#003d7a] shadow-card transition hover:scale-[0.98] flex items-center justify-center gap-2"
+            disabled={loading || !confirmed}
+            className="min-h-[58px] w-full rounded-2xl bg-[#ffff00] px-5 py-4 text-base font-black text-[#003d7a] shadow-card transition hover:scale-[0.98] disabled:opacity-60 disabled:hover:scale-100 flex items-center justify-center gap-2"
           >
-            <Send className="text-2xl" />
-            Kirim Pengajuan
+            {loading ? (
+              <>
+                <Loader2 className="text-2xl animate-spin" />
+                Mengirim...
+              </>
+            ) : (
+              <>
+                <Send className="text-2xl" />
+                Kirim Pengajuan
+              </>
+            )}
           </button>
         </form>
       </section>

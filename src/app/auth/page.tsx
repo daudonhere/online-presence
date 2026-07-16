@@ -8,12 +8,17 @@ import {
   EyeOff,
   ArrowRight,
   Download,
-  X,
   Smartphone,
+  AlertCircle,
+  Loader2,
+  X,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 export default function AuthPage() {
+  const router = useRouter();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
@@ -21,10 +26,11 @@ export default function AuthPage() {
   const [name, setName] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showRetypePassword, setShowRetypePassword] = useState(false);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const [deferredPrompt, setDeferredPrompt] = useState<(Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: "accepted" | "dismissed" }> }) | null>(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
-  const [isDismissed, setIsDismissed] = useState(false);
 
   useEffect(() => {
     const isStandalone =
@@ -33,9 +39,7 @@ export default function AuthPage() {
       (window.navigator as any).standalone === true;
 
     if (isStandalone) return;
-
-    const dismissed = localStorage.getItem("pwa-install-dismissed");
-    if (dismissed) return;
+    if (sessionStorage.getItem("pwa-banner-dismissed")) return;
 
     const handler = (e: Event) => {
       e.preventDefault();
@@ -57,24 +61,96 @@ export default function AuthPage() {
     setDeferredPrompt(null);
   };
 
-  const handleDismiss = () => {
+  const handleDismissBanner = () => {
     setShowInstallBanner(false);
-    setIsDismissed(true);
-    localStorage.setItem("pwa-install-dismissed", "true");
+    sessionStorage.setItem("pwa-banner-dismissed", "1");
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (mode === "register" && password !== retypePassword) {
-      alert("Password tidak cocok");
-      return;
+    setError("");
+
+    if (mode === "register") {
+      if (!name.trim() || !phone.trim() || !password) {
+        setError("Semua field wajib diisi");
+        return;
+      }
+      if (password !== retypePassword) {
+        setError("Password tidak cocok");
+        return;
+      }
+      if (password.length < 6) {
+        setError("Password minimal 6 karakter");
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const res = await fetch("/api/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: name.trim(), phone: phone.trim(), password }),
+        });
+
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error || "Registrasi gagal");
+          setLoading(false);
+          return;
+        }
+
+        // Auto-login after register
+        const loginResult = await signIn("credentials", {
+          phone: phone.trim(),
+          password,
+          redirect: false,
+        });
+
+        if (loginResult?.error) {
+          setError("Registrasi berhasil, tapi login otomatis gagal. Silakan login manual.");
+          setMode("login");
+          setLoading(false);
+          return;
+        }
+
+        router.push("/");
+        router.refresh();
+      } catch {
+        setError("Terjadi kesalahan jaringan");
+        setLoading(false);
+      }
+    } else {
+      if (!phone.trim() || !password) {
+        setError("Telepon dan password wajib diisi");
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const result = await signIn("credentials", {
+          phone: phone.trim(),
+          password,
+          redirect: false,
+        });
+
+        if (result?.error) {
+          setError("Nomor telepon atau password salah");
+          setLoading(false);
+          return;
+        }
+
+        router.push("/");
+        router.refresh();
+      } catch {
+        setError("Terjadi kesalahan jaringan");
+        setLoading(false);
+      }
     }
-    alert(mode === "login" ? "Login berhasil" : "Register berhasil");
   };
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
-      <section className="w-full rounded-b-[34px] bg-gradient-to-br from-[#0c6b46] via-[#1b8659] to-[#075d3d] p-6 pb-20 text-white overflow-hidden relative">
+      <section className="w-full rounded-b-[34px] bg-gradient-to-br from-[#0c6b46] via-[#1b8659] to-[#075d3d] px-6 pt-8 pb-6 text-white overflow-hidden relative">
         <div className="absolute -left-10 -bottom-10 h-40 w-40 rounded-full bg-[#003d7a]/25" />
         <div className="absolute right-8 top-8 grid grid-cols-2 gap-1 opacity-80">
           {Array.from({ length: 8 }).map((_, i) => (
@@ -82,8 +158,15 @@ export default function AuthPage() {
           ))}
         </div>
 
-        <div className="relative mt-5 text-center">
-          <h1 className="font-display text-3xl font-bold tracking-tight">
+        <div className="relative mt-5 flex flex-col items-center justify-end pb-2">
+          <div className="h-20 w-20 rounded-2xl bg-white p-1.5 shadow-card ring-4 ring-[#ffff00]/40">
+            <img // eslint-disable-line @next/next/no-img-element
+              src="/icons/logo.png"
+              alt="Logo Al-Riyadl"
+              className="h-full w-full rounded-xl object-contain"
+            />
+          </div>
+          <h1 className="mt-4 font-display text-3xl font-bold tracking-tight">
             {mode === "login" ? "Selamat Datang" : "Buat Akun Baru"}
           </h1>
           <p className="mt-2 text-sm text-white/80">
@@ -95,7 +178,14 @@ export default function AuthPage() {
       </section>
 
       <main className="flex-1 px-5 flex items-center justify-center">
-        <section className="w-full max-w-md rounded-[28px] bg-white p-5 shadow-card ring-2 ring-[#1b8659]/30">
+        <section className="w-full max-w-md rounded-[28px] bg-white p-5 shadow-card ring-2 ring-[#1b8659]/30 -mt-[12%]">
+          {error && (
+            <div className="mb-4 flex items-center gap-2 rounded-2xl bg-red-50 p-3 text-sm font-medium text-red-700 ring-1 ring-red-200">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              {error}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             {mode === "register" && (
               <div>
@@ -185,10 +275,17 @@ export default function AuthPage() {
 
             <button
               type="submit"
-              className="min-h-[58px] w-full rounded-2xl bg-[#ffff00] px-5 py-4 text-base font-black text-[#003d7a] shadow-card transition hover:scale-[0.98] flex items-center justify-center gap-2"
+              disabled={loading}
+              className="min-h-[58px] w-full rounded-2xl bg-[#ffff00] px-5 py-4 text-base font-black text-[#003d7a] shadow-card transition hover:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
-              {mode === "login" ? "Masuk" : "Daftar Sekarang"}
-              <ArrowRight className="text-2xl" />
+              {loading ? (
+                <Loader2 className="text-2xl animate-spin" />
+              ) : (
+                <>
+                  {mode === "login" ? "Masuk" : "Daftar Sekarang"}
+                  <ArrowRight className="text-2xl" />
+                </>
+              )}
             </button>
           </form>
 
@@ -197,7 +294,7 @@ export default function AuthPage() {
               <p className="text-sm text-slate-500">
                 Belum punya akun?{" "}
                 <button
-                  onClick={() => setMode("register")}
+                  onClick={() => { setMode("register"); setError(""); }}
                   className="font-bold text-[#1b8659] hover:underline"
                 >
                   Daftar di sini
@@ -207,7 +304,7 @@ export default function AuthPage() {
               <p className="text-sm text-slate-500">
                 Sudah punya akun?{" "}
                 <button
-                  onClick={() => setMode("login")}
+                  onClick={() => { setMode("login"); setError(""); }}
                   className="font-bold text-[#1b8659] hover:underline"
                 >
                   Masuk di sini
@@ -218,32 +315,33 @@ export default function AuthPage() {
         </section>
       </main>
 
-      {showInstallBanner && !isDismissed && (
+      {showInstallBanner && (
         <div className="fixed bottom-0 left-0 right-0 z-50 animate-[slideUp_0.4s_ease-out]">
           <div className="mx-auto max-w-md p-4">
-            <div className="rounded-[24px] bg-white p-5 shadow-[0_-4px_30px_rgba(0,0,0,0.15)] ring-1 ring-slate-100">
-              <div className="flex items-start gap-4">
-                <div className="h-14 w-14 shrink-0 rounded-2xl bg-gradient-to-br from-[#0c6b46] to-[#1b8659] flex items-center justify-center">
-                  <Smartphone className="text-2xl text-[#ffff00]" />
+            <div className="rounded-[24px] bg-[#0a0a0a] p-5 shadow-[0_-4px_30px_rgba(0,0,0,0.4)]">
+              <div className="flex items-start gap-3">
+                <div className="h-14 w-14 shrink-0 rounded-2xl bg-white/10 flex items-center justify-center">
+                  <Smartphone className="text-2xl text-white" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-display text-base font-bold tracking-tight text-slate-950">
-                    Install Absensi Guru
+                  <h3 className="text-base font-bold tracking-tight text-white">
+                    Install Absensi Al-Riyadl
                   </h3>
-                  <p className="mt-1 text-sm leading-relaxed text-slate-500">
+                  <p className="mt-1 text-sm leading-relaxed text-white/60">
                     Pasang aplikasi ini di perangkat Anda untuk akses lebih cepat dan notifikasi absensi.
                   </p>
                 </div>
                 <button
-                  onClick={handleDismiss}
-                  className="h-8 w-8 shrink-0 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-200 transition"
+                  onClick={handleDismissBanner}
+                  className="h-8 w-8 shrink-0 rounded-full bg-white/10 flex items-center justify-center text-white/60 hover:bg-white/20 hover:text-white transition"
+                  aria-label="Tutup"
                 >
-                  <X className="text-lg" />
+                  <X className="h-4 w-4" />
                 </button>
               </div>
               <button
                 onClick={handleInstall}
-                className="mt-4 min-h-[50px] w-full rounded-2xl bg-[#1b8659] px-5 py-3 text-sm font-black text-[#ffff00] shadow-card transition hover:scale-[0.98] flex items-center justify-center gap-2"
+                className="mt-4 min-h-[50px] w-full rounded-2xl bg-white px-5 py-3 text-sm font-bold text-black transition hover:bg-white/90 flex items-center justify-center gap-2"
               >
                 <Download className="text-xl" />
                 Install Sekarang

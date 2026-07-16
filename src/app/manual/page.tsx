@@ -4,17 +4,185 @@ import {
   ArrowLeft,
   Calendar,
   Clock,
+  Loader2,
   NotebookPen,
   Send,
 } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DashboardLayout } from "@/components/layout";
+import { DatePicker } from "@/components/ui/DatePicker";
+import { useFormValidation, FieldError } from "@/lib/hooks";
+import { attendanceSchema } from "@/lib/validations";
+
+interface AttendanceRecord {
+  id: number;
+  date: string;
+  time: string;
+  notes: string | null;
+  status: "hadir" | "izin" | "alpha" | "libur" | "pending";
+  checkOutTime: string | null;
+}
+
+const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  hadir: { label: "Hadir", color: "text-emerald-600", bg: "bg-emerald-50" },
+  izin: { label: "Izin", color: "text-amber-600", bg: "bg-amber-50" },
+  alpha: { label: "Alpha", color: "text-red-600", bg: "bg-red-50" },
+  pending: { label: "Menunggu", color: "text-amber-600", bg: "bg-amber-50" },
+  menunggu: { label: "Menunggu", color: "text-amber-600", bg: "bg-amber-50" },
+};
+
+function formatDay(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00");
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+function getCurrentTime(): string {
+  const now = new Date();
+  return now.toTimeString().slice(0, 5);
+}
+
+function getTodayDate(): string {
+  return new Date().toISOString().split("T")[0];
+}
 
 export default function ManualPage() {
-  const [date, setDate] = useState("");
-  const [time, setTime] = useState("");
+  const today = getTodayDate();
+
+  const [date, setDate] = useState(today);
+  const [time, setTime] = useState(getCurrentTime());
   const [notes, setNotes] = useState("");
+
+  const [lastAttendance, setLastAttendance] = useState<AttendanceRecord | null>(null);
+  const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const { errors, validate, clearField } = useFormValidation(attendanceSchema);
+
+  const isCheckedInToday = todayAttendance?.status === "hadir" || todayAttendance?.status === "izin";
+  const hasCheckedOut = todayAttendance?.checkOutTime != null;
+
+  useEffect(() => {
+    async function fetchAttendance() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const [lastRes, todayRes] = await Promise.all([
+          fetch("/api/attendance/last"),
+          fetch(`/api/attendance?month=${new Date().getMonth() + 1}&year=${new Date().getFullYear()}`),
+        ]);
+
+        if (lastRes.ok) {
+          const lastData = await lastRes.json();
+          const last = lastData?.attendance ?? lastData;
+          setLastAttendance(last && typeof last === "object" && last.date ? last : null);
+        }
+
+        if (todayRes.ok) {
+          const todayData = await todayRes.json();
+          const records: AttendanceRecord[] = todayData?.attendance ?? (Array.isArray(todayData) ? todayData : []);
+          const todayRecord = records.find((r) => r.date === today) ?? null;
+          setTodayAttendance(todayRecord);
+        }
+      } catch {
+        setError("Gagal memuat data kehadiran.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchAttendance();
+  }, [today]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTime(getCurrentTime());
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  function resetMessages() {
+    setError(null);
+    setSuccess(null);
+  }
+
+  async function handleCheckIn(e: React.FormEvent) {
+    e.preventDefault();
+    resetMessages();
+
+    const submitTime = getCurrentTime();
+    setTime(submitTime);
+
+    if (!validate({ date, time: submitTime, notes: notes || undefined })) {
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const res = await fetch("/api/attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date, time: submitTime, notes: notes || undefined }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error ?? "Gagal mengirim absensi.");
+        return;
+      }
+
+      setTodayAttendance(data.attendance ?? { ...data, checkOutTime: null });
+      setSuccess("Absensi terkirim! Menunggu persetujuan admin.");
+      setConfirmed(false);
+    } catch {
+      setError("Terjadi kesalahan saat mengirim data.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleCheckOut() {
+    resetMessages();
+    setSubmitting(true);
+
+    try {
+      const res = await fetch("/api/attendance/check-out", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ time: getCurrentTime() }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error ?? "Gagal melakukan check-out.");
+        return;
+      }
+
+      setTodayAttendance((prev) =>
+        prev ? { ...prev, checkOutTime: data.checkOutTime ?? getCurrentTime() } : prev
+      );
+      setSuccess("Berhasil check-out!");
+    } catch {
+      setError("Terjadi kesalahan saat check-out.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const statusKey = todayAttendance
+    ? todayAttendance.status
+    : "menunggu";
+  const statusDisplay = STATUS_CONFIG[statusKey] ?? STATUS_CONFIG.menunggu;
 
   return (
     <DashboardLayout>
@@ -36,7 +204,7 @@ export default function ManualPage() {
               Hari Ini
             </div>
             <h2 className="mt-3 font-display text-lg font-bold tracking-tight">
-              Rabu, 24 Juli 2026
+              {formatDay(today)}
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-white/82">
               Isi data kedatangan hari ini.
@@ -47,7 +215,7 @@ export default function ManualPage() {
 
       <form
         className="mt-4 rounded-[28px] bg-white p-4 shadow-card ring-1 ring-slate-100"
-        onSubmit={(e) => e.preventDefault()}
+        onSubmit={handleCheckIn}
       >
         <div className="space-y-4">
           <div>
@@ -58,20 +226,18 @@ export default function ManualPage() {
               <Calendar className="text-lg text-[#1b8659]" />
               Tanggal Absensi
             </label>
-            <div className="mt-2 relative">
-              <input
-                id="attendance-date"
-                name="attendance-date"
-                type="date"
+            <div className="mt-2">
+              <DatePicker
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="min-h-[54px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 pr-12 text-base font-semibold text-slate-900 outline-none transition focus:border-[#1b8659] focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                onChange={(v) => { setDate(v); clearField("date"); }}
+                minDate={today}
+                placeholder="Pilih tanggal absensi"
               />
-              <Calendar className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xl text-slate-400" />
             </div>
             <p className="mt-1.5 text-xs text-slate-500">
               Pastikan tanggal sesuai hari kerja aktif.
             </p>
+            <FieldError error={errors.date} />
           </div>
 
           <div>
@@ -86,15 +252,15 @@ export default function ManualPage() {
               <input
                 id="arrival-time"
                 name="arrival-time"
-                type="time"
+                type="text"
                 value={time}
-                onChange={(e) => setTime(e.target.value)}
-                className="min-h-[54px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 pr-12 text-base font-semibold text-slate-900 outline-none transition focus:border-[#1b8659] focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                readOnly
+                className="min-h-[54px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 pr-12 text-base font-semibold text-slate-900 outline-none cursor-not-allowed"
               />
               <Clock className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xl text-slate-400" />
             </div>
             <p className="mt-1.5 text-xs text-slate-500">
-              Jam akan digunakan sebagai bukti waktu absen masuk.
+              Jam otomatis diambil saat Anda menekan tombol kirim.
             </p>
           </div>
 
@@ -112,34 +278,64 @@ export default function ManualPage() {
               rows={4}
               placeholder="Contoh: Hadir untuk jadwal piket pagi dan mengajar kelas VII A."
               value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              onChange={(e) => { setNotes(e.target.value); clearField("notes"); }}
               className="mt-2 w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-base font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#1b8659] focus:bg-white focus:ring-4 focus:ring-emerald-100"
             />
+            <FieldError error={errors.notes} />
           </div>
         </div>
 
-        <div className="mt-5 rounded-3xl bg-[#ffff00] p-4 text-[#003d7a]">
+        <div className="mt-5 rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-100">
           <div className="flex items-start gap-3">
-            <div className="mt-0.5 h-9 w-9 shrink-0 rounded-2xl bg-[#003d7a] flex items-center justify-center text-[#ffff00]">
-              <Send className="text-xl" />
-            </div>
-            <div>
-              <p className="text-sm font-black">Verifikasi Kehadiran</p>
-              <p className="mt-1 text-xs font-semibold leading-relaxed text-[#003d7a]/80">
-                Dengan menekan tombol kirim, data absensi akan tersimpan untuk
-                rekap kehadiran guru MTS AL-RIYADL.
-              </p>
-            </div>
+            <input
+              type="checkbox"
+              id="confirm-manual"
+              checked={confirmed}
+              onChange={(e) => setConfirmed(e.target.checked)}
+              className="mt-1 h-5 w-5 rounded border-slate-300 text-[#1b8659] focus:ring-[#1b8659]"
+            />
+            <label htmlFor="confirm-manual" className="text-sm leading-relaxed text-slate-600">
+              Saya hadir di sekolah pada tanggal dan jam yang tertera. Absensi
+              ini memerlukan persetujuan admin.
+            </label>
           </div>
         </div>
+
+        {error && (
+          <p className="mt-3 text-center text-sm font-bold text-red-600">{error}</p>
+        )}
+        {success && (
+          <p className="mt-3 text-center text-sm font-bold text-emerald-600">{success}</p>
+        )}
 
         <button
           type="submit"
-          className="mt-4 min-h-[58px] w-full rounded-2xl bg-[#1b8659] px-5 py-4 text-center text-base font-black text-[#ffff00] shadow-card transition hover:scale-[0.98] flex items-center justify-center gap-2"
+          disabled={submitting || isCheckedInToday || !confirmed}
+          className="mt-4 min-h-[58px] w-full rounded-2xl bg-[#1b8659] px-5 py-4 text-center text-base font-black text-[#ffff00] shadow-card transition hover:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:hover:scale-100"
         >
-          <Send className="text-2xl" />
-          Kirim Absensi
+          {submitting ? (
+            <Loader2 className="text-2xl animate-spin" />
+          ) : (
+            <Send className="text-2xl" />
+          )}
+          {isCheckedInToday ? "Sudah absen masuk" : "Kirim Absensi"}
         </button>
+
+        {isCheckedInToday && !hasCheckedOut && (
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={handleCheckOut}
+            className="mt-3 min-h-[54px] w-full rounded-2xl border-2 border-[#1b8659] bg-white px-5 py-4 text-center text-base font-black text-[#1b8659] transition hover:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:hover:scale-100"
+          >
+            {submitting ? (
+              <Loader2 className="text-xl animate-spin" />
+            ) : (
+              <Clock className="text-xl" />
+            )}
+            Check-out Sekarang
+          </button>
+        )}
       </form>
 
       <section className="mt-4 rounded-[28px] bg-white p-4 shadow-card ring-1 ring-slate-100">
@@ -148,12 +344,58 @@ export default function ManualPage() {
             <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">
               Status Terakhir
             </p>
-            <h3 className="mt-1 font-display text-xl font-bold tracking-tight text-slate-950">
-              Belum absen masuk
-            </h3>
+            {loading ? (
+              <div className="mt-2 flex items-center gap-2 text-sm text-slate-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Memuat...
+              </div>
+            ) : todayAttendance ? (
+              <div>
+                <h3 className="mt-1 font-display text-xl font-bold tracking-tight text-slate-950">
+                  {todayAttendance.status === "hadir" && hasCheckedOut
+                    ? "Sudah check-out"
+                    : todayAttendance.status === "hadir"
+                      ? "Sudah absen masuk"
+                      : todayAttendance.status === "izin"
+                        ? "Sudah izin hari ini"
+                        : todayAttendance.status === "alpha"
+                          ? "Alpha hari ini"
+                          : todayAttendance.status}
+                </h3>
+                {todayAttendance.checkOutTime && (
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Masuk: {todayAttendance.time} — Keluar: {todayAttendance.checkOutTime}
+                  </p>
+                )}
+                {!todayAttendance.checkOutTime && todayAttendance.status === "hadir" && (
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Jam masuk: {todayAttendance.time}
+                  </p>
+                )}
+              </div>
+            ) : lastAttendance ? (
+              <div>
+                <h3 className="mt-1 font-display text-xl font-bold tracking-tight text-slate-950">
+                  {lastAttendance.status === "hadir"
+                    ? "Hadir"
+                    : lastAttendance.status === "izin"
+                      ? "Izin"
+                      : lastAttendance.status === "alpha"
+                        ? "Alpha"
+                        : lastAttendance.status}
+                </h3>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {formatDay(lastAttendance.date)}
+                </p>
+              </div>
+            ) : (
+              <h3 className="mt-1 font-display text-xl font-bold tracking-tight text-slate-950">
+                Belum ada data
+              </h3>
+            )}
           </div>
-          <span className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-black text-amber-600">
-            Menunggu
+          <span className={`rounded-full ${statusDisplay.bg} px-3 py-1.5 text-xs font-black ${statusDisplay.color}`}>
+            {statusDisplay.label}
           </span>
         </div>
       </section>

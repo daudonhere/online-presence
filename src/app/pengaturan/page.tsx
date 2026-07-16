@@ -12,68 +12,183 @@ import {
   LogOut,
   Camera,
   X,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
+import { useSession, signOut } from "next-auth/react";
 import { DashboardLayout } from "@/components/layout";
 
 const toggles = [
   {
+    key: "reminderMasuk" as const,
     label: "Pengingat Absen Masuk",
     description: "Dikirim sebelum jam 07.00 WIB",
-    defaultOn: true,
   },
   {
+    key: "reminderPulang" as const,
     label: "Pengingat Absen Pulang",
     description: "Dikirim setelah jam mengajar selesai",
-    defaultOn: true,
   },
   {
+    key: "monthlySummary" as const,
     label: "Ringkasan Bulanan",
     description: "Laporan singkat setiap akhir bulan",
-    defaultOn: false,
   },
 ];
 
 export default function PengaturanPage() {
-  const [notifStates, setNotifStates] = useState(
-    toggles.map((t) => t.defaultOn)
-  );
+  const { data: session } = useSession();
+
+  const [profile, setProfile] = useState({
+    name: "",
+    subject: "",
+    nip: "",
+    email: "",
+    phone: "",
+  });
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [password, setPassword] = useState("");
   const [retypePassword, setRetypePassword] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [profile, setProfile] = useState({
-    name: "Ibu Titin S.Pd",
-    subject: "Guru Bahasa Indonesia",
-    nip: "19870512 201403 2 006",
-    email: "titin@mtsalriyadl.sch.id",
-    phone: "0812-3456-7890",
+  const [notifStates, setNotifStates] = useState({
+    reminderMasuk: true,
+    reminderPulang: true,
+    monthlySummary: false,
   });
 
-  const toggleNotif = (index: number) => {
-    setNotifStates((prev) =>
-      prev.map((v, i) => (i === index ? !v : v))
-    );
-  };
+  const [loading, setLoading] = useState(true);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [savingNotif, setSavingNotif] = useState(false);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 1024 * 1024) {
-      alert("Ukuran gambar maksimal 1 MB");
-      return;
+  const [profileMsg, setProfileMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [avatarMsg, setAvatarMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [notifMsg, setNotifMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const [profileRes, notifRes] = await Promise.all([
+          fetch("/api/profile"),
+          fetch("/api/notifications/preferences"),
+        ]);
+
+        if (profileRes.ok) {
+          const profileData = await profileRes.json();
+          setProfile({
+            name: profileData.name || "",
+            subject: profileData.profile?.subject || "",
+            nip: profileData.profile?.nip || "",
+            email: profileData.profile?.email || "",
+            phone: profileData.phone || "",
+          });
+          if (profileData.profile?.avatarUrl) {
+            setProfileImage(profileData.profile.avatarUrl);
+          }
+        }
+
+        if (notifRes.ok) {
+          const notifData = await notifRes.json();
+          setNotifStates({
+            reminderMasuk: notifData.reminderMasuk ?? true,
+            reminderPulang: notifData.reminderPulang ?? true,
+            monthlySummary: notifData.monthlySummary ?? false,
+          });
+        }
+      } catch {
+        // silent — defaults are fine
+      } finally {
+        setLoading(false);
+      }
     }
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setProfileImage(reader.result as string);
-    };
-    reader.readAsDataURL(file);
-  };
+    fetchData();
+  }, []);
 
   const handleProfileChange = (field: string, value: string) => {
     setProfile((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSaveProfile = async () => {
+    setSavingProfile(true);
+    setProfileMsg(null);
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profile),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setProfileMsg({ type: "error", text: data.error || "Gagal menyimpan profil" });
+      } else {
+        setProfileMsg({ type: "success", text: "Profil berhasil disimpan" });
+      }
+    } catch {
+      setProfileMsg({ type: "error", text: "Terjadi kesalahan jaringan" });
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 1024 * 1024) {
+      setAvatarMsg({ type: "error", text: "Ukuran gambar maksimal 1 MB" });
+      return;
+    }
+
+    setUploadingAvatar(true);
+    setAvatarMsg(null);
+    try {
+      const formData = new FormData();
+      formData.append("avatar", file);
+      const res = await fetch("/api/profile/avatar", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAvatarMsg({ type: "error", text: data.error || "Gagal upload avatar" });
+      } else {
+        setProfileImage(data.avatarUrl);
+        setAvatarMsg({ type: "success", text: "Avatar berhasil diunggah" });
+      }
+    } catch {
+      setAvatarMsg({ type: "error", text: "Terjadi kesalahan jaringan" });
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
+  const toggleNotif = async (key: keyof typeof notifStates) => {
+    const newState = { ...notifStates, [key]: !notifStates[key] };
+    setNotifStates(newState);
+    setSavingNotif(true);
+    setNotifMsg(null);
+    try {
+      const res = await fetch("/api/notifications/preferences", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newState),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setNotifMsg({ type: "error", text: data.error || "Gagal menyimpan preferensi" });
+        setNotifStates((prev) => ({ ...prev, [key]: !newState[key] }));
+      } else {
+        setNotifMsg({ type: "success", text: "Preferensi notifikasi disimpan" });
+      }
+    } catch {
+      setNotifMsg({ type: "error", text: "Terjadi kesalahan jaringan" });
+      setNotifStates((prev) => ({ ...prev, [key]: !newState[key] }));
+    } finally {
+      setSavingNotif(false);
+    }
   };
 
   const handlePasswordSubmit = () => {
@@ -91,6 +206,9 @@ export default function PengaturanPage() {
     alert("Password berhasil diubah");
   };
 
+  const displayName = profile.name || session?.user?.name || "Guru";
+  const displaySubject = profile.subject || "";
+
   return (
     <DashboardLayout>
       <div className="w-full max-w-md">
@@ -101,10 +219,15 @@ export default function PengaturanPage() {
         <div className="relative flex items-center gap-4">
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="h-20 w-20 shrink-0 rounded-[26px] bg-white p-1 shadow-card ring-4 ring-[#ffff00]/40 relative group cursor-pointer"
+            disabled={uploadingAvatar}
+            className="h-20 w-20 shrink-0 rounded-[26px] bg-white p-1 shadow-card ring-4 ring-[#ffff00]/40 relative group cursor-pointer disabled:opacity-50"
           >
-            {profileImage ? (
-              <img
+            {uploadingAvatar ? (
+              <div className="h-full w-full rounded-[22px] bg-gradient-to-br from-emerald-100 to-white flex items-center justify-center overflow-hidden">
+                <Loader2 className="text-2xl text-[#1b8659] animate-spin" />
+              </div>
+            ) : profileImage ? (
+              <img // eslint-disable-line @next/next/no-img-element
                 src={profileImage}
                 alt="Profile"
                 className="h-full w-full rounded-[22px] object-cover"
@@ -131,24 +254,35 @@ export default function PengaturanPage() {
               Profil Guru
             </div>
             <h1 className="mt-2 font-display text-lg font-bold tracking-tight truncate">
-              {profile.name}
+              {loading ? "..." : displayName}
             </h1>
             <p className="mt-1 text-sm font-medium text-white/80 truncate">
-              {profile.subject}
+              {loading ? "" : displaySubject}
             </p>
             <p className="mt-1 text-xs text-white/70 truncate">
-              NIP. {profile.nip}
+              {loading ? "" : `NIP. ${profile.nip}`}
             </p>
           </div>
         </div>
       </section>
+
+      {avatarMsg && (
+        <div className={`mt-3 flex items-center gap-2 rounded-2xl p-3 text-sm font-medium ring-1 ${avatarMsg.type === "error" ? "bg-red-50 text-red-700 ring-red-200" : "bg-emerald-50 text-emerald-700 ring-emerald-200"}`}>
+          {avatarMsg.type === "error" ? <AlertCircle className="h-4 w-4 shrink-0" /> : <CheckCircle2 className="h-4 w-4 shrink-0" />}
+          {avatarMsg.text}
+        </div>
+      )}
 
       <section className="mt-5 rounded-[28px] bg-white p-4 shadow-card ring-1 ring-slate-100">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-[#1b8659]">Akun</p>
             <h2 className="font-display text-xl font-bold tracking-tight text-slate-950">
-              Data Dasar
+              {loading ? (
+                <span className="inline-block h-6 w-40 animate-pulse rounded bg-slate-200" />
+              ) : (
+                "Data Dasar"
+              )}
             </h2>
           </div>
           <div className="h-11 w-11 rounded-2xl bg-emerald-50 flex items-center justify-center">
@@ -162,7 +296,8 @@ export default function PengaturanPage() {
               type="text"
               value={profile.name}
               onChange={(e) => handleProfileChange("name", e.target.value)}
-              className="mt-1 w-full bg-transparent text-sm font-bold text-slate-900 outline-none"
+              disabled={loading}
+              className="mt-1 w-full bg-transparent text-sm font-bold text-slate-900 outline-none disabled:opacity-50"
             />
           </div>
           <div className="rounded-2xl bg-slate-50 px-4 py-3">
@@ -171,7 +306,8 @@ export default function PengaturanPage() {
               type="text"
               value={profile.subject}
               onChange={(e) => handleProfileChange("subject", e.target.value)}
-              className="mt-1 w-full bg-transparent text-sm font-bold text-slate-900 outline-none"
+              disabled={loading}
+              className="mt-1 w-full bg-transparent text-sm font-bold text-slate-900 outline-none disabled:opacity-50"
             />
           </div>
           <div className="rounded-2xl bg-slate-50 px-4 py-3">
@@ -180,7 +316,8 @@ export default function PengaturanPage() {
               type="text"
               value={profile.nip}
               onChange={(e) => handleProfileChange("nip", e.target.value)}
-              className="mt-1 w-full bg-transparent text-sm font-bold text-slate-900 outline-none"
+              disabled={loading}
+              className="mt-1 w-full bg-transparent text-sm font-bold text-slate-900 outline-none disabled:opacity-50"
             />
           </div>
           <div className="flex items-center gap-4 rounded-2xl bg-slate-50 px-4 py-3">
@@ -190,7 +327,8 @@ export default function PengaturanPage() {
                 type="email"
                 value={profile.email}
                 onChange={(e) => handleProfileChange("email", e.target.value)}
-                className="mt-1 w-full bg-transparent text-sm font-bold text-slate-900 outline-none"
+                disabled={loading}
+                className="mt-1 w-full bg-transparent text-sm font-bold text-slate-900 outline-none disabled:opacity-50"
               />
             </div>
             <Mail className="text-xl text-slate-400 shrink-0" />
@@ -202,12 +340,32 @@ export default function PengaturanPage() {
                 type="tel"
                 value={profile.phone}
                 onChange={(e) => handleProfileChange("phone", e.target.value)}
-                className="mt-1 w-full bg-transparent text-sm font-bold text-slate-900 outline-none"
+                disabled={loading}
+                className="mt-1 w-full bg-transparent text-sm font-bold text-slate-900 outline-none disabled:opacity-50"
               />
             </div>
             <Phone className="text-xl text-slate-400 shrink-0" />
           </div>
         </div>
+
+        {profileMsg && (
+          <div className={`mt-3 flex items-center gap-2 rounded-2xl p-3 text-sm font-medium ring-1 ${profileMsg.type === "error" ? "bg-red-50 text-red-700 ring-red-200" : "bg-emerald-50 text-emerald-700 ring-emerald-200"}`}>
+            {profileMsg.type === "error" ? <AlertCircle className="h-4 w-4 shrink-0" /> : <CheckCircle2 className="h-4 w-4 shrink-0" />}
+            {profileMsg.text}
+          </div>
+        )}
+
+        <button
+          onClick={handleSaveProfile}
+          disabled={savingProfile || loading}
+          className="mt-4 min-h-[54px] w-full rounded-2xl bg-[#1b8659] px-5 py-3 text-sm font-black text-[#ffff00] shadow-card transition hover:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+        >
+          {savingProfile ? (
+            <Loader2 className="text-xl animate-spin" />
+          ) : (
+            "Simpan Profil"
+          )}
+        </button>
       </section>
 
       <section className="mt-4 rounded-[28px] bg-white p-4 shadow-card ring-1 ring-slate-100">
@@ -254,9 +412,9 @@ export default function PengaturanPage() {
           </div>
         </div>
         <div className="mt-4 divide-y divide-slate-100">
-          {toggles.map((item, i) => (
+          {toggles.map((item) => (
             <div
-              key={item.label}
+              key={item.key}
               className="flex items-center justify-between gap-4 py-3"
             >
               <div>
@@ -266,9 +424,10 @@ export default function PengaturanPage() {
                 <p className="text-xs text-slate-500">{item.description}</p>
               </div>
               <button
-                onClick={() => toggleNotif(i)}
-                className={`min-h-[32px] w-14 rounded-full p-1 flex transition ${
-                  notifStates[i]
+                onClick={() => toggleNotif(item.key)}
+                disabled={savingNotif}
+                className={`min-h-[32px] w-14 rounded-full p-1 flex transition disabled:opacity-50 ${
+                  notifStates[item.key]
                     ? "bg-[#1b8659] justify-end"
                     : "bg-slate-200 justify-start"
                 }`}
@@ -279,16 +438,22 @@ export default function PengaturanPage() {
             </div>
           ))}
         </div>
+        {notifMsg && (
+          <div className={`mt-3 flex items-center gap-2 rounded-2xl p-3 text-sm font-medium ring-1 ${notifMsg.type === "error" ? "bg-red-50 text-red-700 ring-red-200" : "bg-emerald-50 text-emerald-700 ring-emerald-200"}`}>
+            {notifMsg.type === "error" ? <AlertCircle className="h-4 w-4 shrink-0" /> : <CheckCircle2 className="h-4 w-4 shrink-0" />}
+            {notifMsg.text}
+          </div>
+        )}
       </section>
 
       <section className="mt-4 rounded-[28px] bg-white p-4 shadow-card ring-1 ring-red-100">
-        <a
-          href="#"
-          className="min-h-[60px] flex items-center justify-center gap-3 rounded-2xl bg-red-50 px-5 py-4 text-base font-black text-red-600 transition hover:scale-[0.99] hover:bg-red-100"
+        <button
+          onClick={() => signOut({ callbackUrl: "/auth" })}
+          className="min-h-[60px] w-full flex items-center justify-center gap-3 rounded-2xl bg-red-50 px-5 py-4 text-base font-black text-red-600 transition hover:scale-[0.99] hover:bg-red-100"
         >
           <LogOut className="text-2xl" />
           Keluar dari Akun
-        </a>
+        </button>
       </section>
 
       <p className="mt-5 text-center text-xs font-medium text-slate-400">

@@ -1,14 +1,19 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { AuthProvider } from "@/components/providers/SessionProvider";
 
 export const metadata: Metadata = {
-  title: "Absensi MTS AL-RIYADL",
-  description: "Dashboard Absensi Guru MTS AL-RIYADL",
+  title: "Absensi Al-Riyadl",
+  description: "Aplikasi Absensi Guru MTS AL-RIYADL",
   manifest: "/manifest.json",
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/icons/apple-touch-icon.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Absensi MTS AL-RIYADL",
+    title: "Absensi Al-Riyadl",
   },
 };
 
@@ -27,9 +32,11 @@ export default function RootLayout({
   return (
     <html lang="id">
       <head>
-        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
       </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <AuthProvider>{children}</AuthProvider>
+      </body>
     </html>
   );
 }

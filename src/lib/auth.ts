@@ -1,0 +1,64 @@
+import NextAuth from "next-auth";
+import Credentials from "next-auth/providers/credentials";
+import { PrismaAdapter } from "@auth/prisma-adapter";
+import { prisma } from "@/lib/prisma";
+import { compare } from "bcryptjs";
+import { checkRateLimit, resetRateLimit } from "@/lib/rate-limit";
+
+export const { handlers, signIn, signOut, auth } = NextAuth({
+  adapter: PrismaAdapter(prisma),
+  session: { strategy: "jwt" },
+  pages: {
+    signIn: "/auth",
+  },
+  providers: [
+    Credentials({
+      credentials: {
+        phone: { label: "Phone", type: "text" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        const phone = credentials?.phone as string | undefined;
+        const password = credentials?.password as string | undefined;
+
+        if (!phone || !password) return null;
+
+        const { allowed } = checkRateLimit(`login:${phone}`, 5, 60000);
+        if (!allowed) return null;
+
+        const user = await prisma.user.findUnique({ where: { phone } });
+        if (!user) return null;
+
+        const valid = await compare(password, user.password);
+        if (!valid) return null;
+
+        resetRateLimit(`login:${phone}`);
+
+        return {
+          id: String(user.id),
+          name: user.name,
+          phone: user.phone,
+          role: user.role,
+        };
+      },
+    }),
+  ],
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+        token.phone = (user as unknown as { phone: string }).phone;
+        token.role = (user as unknown as { role: string }).role;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (session.user) {
+        session.user.id = token.id as string;
+        (session.user as unknown as { phone: string }).phone = token.phone as string;
+        (session.user as unknown as { role: string }).role = token.role as string;
+      }
+      return session;
+    },
+  },
+});

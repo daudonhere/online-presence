@@ -1,8 +1,15 @@
 import Link from "next/link";
-import { QrCode, ScanLine, Pointer } from "lucide-react";
+import { ScanLine, Pointer } from "lucide-react";
 import { DashboardLayout } from "@/components/layout";
+import { QrUserId } from "@/components/ui/QrUserId";
+import { auth } from "@/lib/auth";
 
-export default function Home() {
+export default async function Home() {
+  const session = await auth();
+  const user = session?.user;
+  const userId = user?.id ? Number(user.id) : 0;
+  const userName = user?.name || "Guru";
+
   return (
     <DashboardLayout>
       <section className="w-full max-w-md mx-auto rounded-[34px] bg-white p-5 shadow-soft ring-1 ring-slate-100">
@@ -16,8 +23,8 @@ export default function Home() {
           </div>
 
           <div className="relative flex-1 flex items-center justify-center">
-            <div className="relative h-52 w-52 rounded-[34px] bg-white shadow-card ring-4 ring-[#ffff00]/40 overflow-hidden">
-              <QrCode className="absolute inset-0 w-full h-full text-black" strokeWidth={0.5} />
+            <div className="relative h-52 w-52 rounded-[34px] bg-white shadow-card ring-4 ring-[#ffff00]/40 overflow-hidden flex items-center justify-center p-2">
+              <QrUserId userId={userId} name={userName} />
             </div>
           </div>
 

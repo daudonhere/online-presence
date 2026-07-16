@@ -1,3 +1,6 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import {
   BarChart3,
   TrendingUp,
@@ -11,60 +14,40 @@ import {
 import Link from "next/link";
 import { DashboardLayout } from "@/components/layout";
 
-const weeklyData = [
-  {
-    week: "Minggu 1",
-    date: "1–5 Juli",
-    summary: "4 Hadir · 1 Izin",
-    days: [
-      { day: "Sen", status: "hadir" },
-      { day: "Sel", status: "hadir" },
-      { day: "Rab", status: "hadir" },
-      { day: "Kam", status: "izin" },
-      { day: "Jum", status: "hadir" },
-    ],
-  },
-  {
-    week: "Minggu 2",
-    date: "8–12 Juli",
-    summary: "4 Hadir · 1 Izin",
-    days: [
-      { day: "Sen", status: "hadir" },
-      { day: "Sel", status: "hadir" },
-      { day: "Rab", status: "izin" },
-      { day: "Kam", status: "hadir" },
-      { day: "Jum", status: "hadir" },
-    ],
-  },
-  {
-    week: "Minggu 3",
-    date: "15–19 Juli",
-    summary: "5 Hadir",
-    days: [
-      { day: "Sen", status: "hadir" },
-      { day: "Sel", status: "hadir" },
-      { day: "Rab", status: "hadir" },
-      { day: "Kam", status: "hadir" },
-      { day: "Jum", status: "hadir" },
-    ],
-  },
-  {
-    week: "Minggu 4",
-    date: "22–26 Juli",
-    summary: "4 Hadir · 1 Izin",
-    days: [
-      { day: "Sen", status: "hadir" },
-      { day: "Sel", status: "hadir" },
-      { day: "Rab", status: "hadir" },
-      { day: "Kam", status: "izin" },
-      { day: "Jum", status: "hadir" },
-    ],
-  },
-];
+interface DayStatus {
+  day: string;
+  date: number;
+  status: string;
+}
 
-const barChart = [
-  92, 88, 95, 58, 90, 25, 25, 93, 86, 60, 91, 96, 25, 25, 94, 89, 92, 88,
-  90, 25, 25, 97, 92, 94, 91, 89, 25, 25, 95, 90, 87,
+interface WeekData {
+  week: string;
+  date: string;
+  summary: string;
+  days: DayStatus[];
+}
+
+interface DailyChartEntry {
+  day: number;
+  value: number;
+}
+
+interface AnalysisData {
+  month: number;
+  year: number;
+  percentage: number;
+  rating: string;
+  hadir: number;
+  izin: number;
+  alpha: number;
+  libur: number;
+  dailyChart: DailyChartEntry[];
+  weeks: WeekData[];
+}
+
+const MONTH_NAMES = [
+  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+  "Juli", "Agustus", "September", "Oktober", "November", "Desember",
 ];
 
 function getDayBg(status: string) {
@@ -74,6 +57,35 @@ function getDayBg(status: string) {
 }
 
 export default function AnalisaPage() {
+  const [data, setData] = useState<AnalysisData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const now = new Date();
+    const month = now.getMonth() + 1;
+    const year = now.getFullYear();
+
+    fetch(`/api/attendance/analysis?month=${month}&year=${year}`)
+      .then((res) => res.json())
+      .then((json) => setData(json))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading || !data) {
+    return (
+      <DashboardLayout>
+        <section className="w-full max-w-md mx-auto flex items-center justify-center min-h-[60vh]">
+          <p className="text-slate-500 font-medium">Memuat data...</p>
+        </section>
+      </DashboardLayout>
+    );
+  }
+
+  const monthName = MONTH_NAMES[data.month - 1];
+  const barChart = data.dailyChart.map((d) => d.value);
+  const lastDay = data.dailyChart.length;
+
   return (
     <DashboardLayout>
       <section className="w-full max-w-md mx-auto">
@@ -85,7 +97,7 @@ export default function AnalisaPage() {
             <div>
               <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-white/90 ring-1 ring-white/15">
                 <span className="h-2 w-2 rounded-full bg-[#ffff00]" />
-                Juli 2026
+                {monthName} {data.year}
               </div>
               <h1 className="mt-4 font-display text-3xl font-bold tracking-tight">
                 Analisa Kehadiran
@@ -107,10 +119,10 @@ export default function AnalisaPage() {
                 </p>
                 <div className="mt-1 flex items-end gap-2">
                   <span className="font-display text-5xl font-bold leading-none tracking-tight">
-                    92%
+                    {data.percentage}%
                   </span>
                   <span className="pb-1 text-sm font-semibold text-[#ffff00]">
-                    Sangat Baik
+                    {data.rating}
                   </span>
                 </div>
               </div>
@@ -119,7 +131,10 @@ export default function AnalisaPage() {
               </div>
             </div>
             <div className="mt-4 h-3 rounded-full bg-white/20 overflow-hidden">
-              <div className="h-full w-[92%] rounded-full bg-[#ffff00]" />
+              <div
+                className="h-full rounded-full bg-[#ffff00]"
+                style={{ width: `${data.percentage}%` }}
+              />
             </div>
           </div>
         </div>
@@ -130,7 +145,7 @@ export default function AnalisaPage() {
               <CheckCircle2 className="text-2xl text-[#1b8659]" />
             </div>
             <p className="mt-3 font-display text-3xl font-bold tracking-tight text-[#1b8659]">
-              21
+              {data.hadir}
             </p>
             <p className="text-xs font-semibold text-slate-500">Hadir</p>
           </article>
@@ -139,7 +154,7 @@ export default function AnalisaPage() {
               <ClipboardPen className="text-2xl text-amber-500" />
             </div>
             <p className="mt-3 font-display text-3xl font-bold tracking-tight text-amber-500">
-              2
+              {data.izin}
             </p>
             <p className="text-xs font-semibold text-slate-500">Izin</p>
           </article>
@@ -148,7 +163,7 @@ export default function AnalisaPage() {
               <CircleAlert className="text-2xl text-[#003d7a]" />
             </div>
             <p className="mt-3 font-display text-3xl font-bold tracking-tight text-[#003d7a]">
-              0
+              {data.alpha}
             </p>
             <p className="text-xs font-semibold text-slate-500">Alpha</p>
           </article>
@@ -161,7 +176,7 @@ export default function AnalisaPage() {
                 Grafik Harian
               </h2>
               <p className="mt-1 text-sm text-slate-500">
-                Status kehadiran 1–31 Juli 2026
+                Status kehadiran 1–{lastDay} {monthName} {data.year}
               </p>
             </div>
           </div>
@@ -206,7 +221,7 @@ export default function AnalisaPage() {
               <span>14</span>
               <span>21</span>
               <span>28</span>
-              <span>31</span>
+              <span>{lastDay}</span>
             </div>
           </div>
 
@@ -244,7 +259,7 @@ export default function AnalisaPage() {
           </div>
 
           <div className="mt-5 space-y-3">
-            {weeklyData.map((week) => (
+            {data.weeks.map((week) => (
               <article
                 key={week.week}
                 className="rounded-[24px] bg-slate-50 p-4"

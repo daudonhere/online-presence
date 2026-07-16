@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -10,4 +5,87 @@ generator client {
 
 datasource db {
   provider = "sqlite"
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  phone     String   @unique
+  password  String
+  name      String
+  role      String   @default("teacher") // "teacher" | "admin"
+  qrToken   String   @unique @default(uuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  profile                 Profile?
+  attendance              Attendance[]
+  obstacles               Obstacle[]
+  notificationPreference  NotificationPreference?
+  reviewedObstacles       Obstacle[]     @relation("ReviewedBy")
+}
+
+model Profile {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  subject   String
+  nip       String
+  email     String
+  avatarUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Attendance {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  date         DateTime
+  checkInTime  String?
+  checkOutTime String?
+  notes        String?
+   status        String    @default("hadir") // "hadir" | "izin" | "alpha" | "libur" | "pending"
+  source       String?                    // "qr" | "manual" | "obstacle"
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+}
+
+model Obstacle {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  category   String                     // "sakit" | "izin" | "cuti"
+  date       DateTime
+  reason     String
+  fileUrl    String?
+  status     String   @default("pending") // "pending" | "approved" | "rejected"
+  reviewedBy Int?
+  reviewedAt DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user     User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewer User? @relation("ReviewedBy", fields: [reviewedBy], references: [id], onDelete: SetNull)
+}
+
+model NotificationPreference {
+  id             Int      @id @default(autoincrement())
+  userId         Int      @unique
+  reminderMasuk  Boolean  @default(true)
+  reminderPulang Boolean  @default(true)
+  monthlySummary Boolean  @default(false)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Report {
+  id        Int      @id @default(autoincrement())
+  title     String
+  period    String
+  fileUrl   String
+  status    String   @default("ready") // "ready" | "generating" | "failed"
+  createdAt DateTime @default(now())
 }
