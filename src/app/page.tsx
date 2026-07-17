@@ -36,13 +36,15 @@ export default async function Home() {
               <ScanLine className="text-2xl" />
               Scan QR
             </Link>
-            <Link
-              href="/manual"
-              className="min-h-[58px] w-full rounded-2xl bg-white px-5 py-4 text-center text-base font-black text-[#1b8659] transition hover:scale-[0.98] flex items-center justify-center gap-2 shadow-card"
-            >
-              <Pointer className="text-2xl" />
-              Absen Manual
-            </Link>
+            {user?.role !== "admin" && (
+              <Link
+                href="/manual"
+                className="min-h-[58px] w-full rounded-2xl bg-white px-5 py-4 text-center text-base font-black text-[#1b8659] transition hover:scale-[0.98] flex items-center justify-center gap-2 shadow-card"
+              >
+                <Pointer className="text-2xl" />
+                Absen Manual
+              </Link>
+            )}
           </div>
         </div>
       </section>
