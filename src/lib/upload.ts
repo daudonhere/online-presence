@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { supabase } from "./supabase";
+import { getSupabase } from "./supabase";
 
 const ALLOWED_TYPES: Record<string, string[]> = {
   avatars: ["image/jpeg", "image/png"],
@@ -79,7 +79,7 @@ export async function saveFile(
   const ext = mimeToExt[detectedMime] || getExtension(file.name);
   const filename = `${randomUUID()}.${ext}`;
 
-  const { error } = await supabase.storage
+  const { error } = await getSupabase().storage
     .from(folder)
     .upload(filename, buffer, { contentType: detectedMime });
 
@@ -87,7 +87,7 @@ export async function saveFile(
     throw new UploadError("Gagal upload file ke server", 500);
   }
 
-  const { data } = supabase.storage.from(folder).getPublicUrl(filename);
+  const { data } = getSupabase().storage.from(folder).getPublicUrl(filename);
 
   return data.publicUrl;
 }
