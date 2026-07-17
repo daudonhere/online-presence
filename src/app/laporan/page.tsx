@@ -1,17 +1,19 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState } from "react";
 import {
   FileDown,
   CalendarDays,
-  Search,
   FileText,
   UserCheck,
   ClipboardList,
   Loader2,
   Inbox,
+  AlertCircle,
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout";
+import { useQuery } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query-keys";
 
 interface ApiStat {
   label: string;
@@ -195,52 +197,18 @@ export default function LaporanPage() {
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
-  const [reports, setReports] = useState<ReportCard[]>([]);
-  const [monthName, setMonthName] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const fetchReports = useCallback(async (m: number, y: number) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/reports?month=${m}&year=${y}`);
+  const { data, isLoading, isError, error } = useQuery<ApiResponse>({
+    queryKey: queryKeys.reports.list(month, year),
+    queryFn: async () => {
+      const res = await fetch(`/api/reports?month=${month}&year=${year}`);
       if (!res.ok) throw new Error("Gagal memuat laporan");
-      const data: ApiResponse = await res.json();
-      setReports(data.reports.map(mapReport));
-      setMonthName(data.monthName);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Terjadi kesalahan");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      return res.json();
+    },
+  });
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const res = await fetch(`/api/reports?month=${month}&year=${year}`);
-        if (!res.ok) throw new Error("Gagal memuat laporan");
-        const data: ApiResponse = await res.json();
-        if (!cancelled) {
-          setReports(data.reports.map(mapReport));
-          setMonthName(data.monthName);
-        }
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Terjadi kesalahan");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, [month, year]);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    fetchReports(month, year);
-  };
+  const reports = data?.reports.map(mapReport) || [];
+  const monthName = data?.monthName || "";
 
   return (
     <DashboardLayout>
@@ -279,7 +247,7 @@ export default function LaporanPage() {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="mt-4 space-y-3">
+        <div className="mt-4 space-y-3">
           <div>
             <span className="text-xs font-bold uppercase tracking-[0.12em] text-slate-400">
               Bulan
@@ -322,19 +290,7 @@ export default function LaporanPage() {
               ))}
             </div>
           </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full min-h-[52px] rounded-2xl bg-[#1b8659] px-5 py-3 text-sm font-black text-[#ffff00] shadow-card transition hover:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-60"
-          >
-            {loading ? (
-              <Loader2 className="text-xl animate-spin" />
-            ) : (
-              <Search className="text-xl" />
-            )}
-            Tampilkan Laporan
-          </button>
-        </form>
+        </div>
       </section>
 
       <section className="mt-5">
@@ -344,30 +300,31 @@ export default function LaporanPage() {
               Daftar Laporan
             </h2>
             <p className="mt-1 text-sm text-slate-500">
-              {loading
+              {isLoading
                 ? "Memuat laporan..."
-                : error
-                  ? error
+                : isError
+                  ? error?.message || "Terjadi kesalahan"
                   : reports.length > 0
                     ? `${reports.length} laporan tersedia untuk ${monthName}.`
                     : `Tidak ada laporan untuk ${monthName}.`}
             </p>
           </div>
-          {!loading && !error && reports.length > 0 && (
+          {!isLoading && !isError && reports.length > 0 && (
             <span className="rounded-full bg-[#ffff00] px-3 py-1 text-xs font-black text-[#003d7a]">
               Siap Unduh
             </span>
           )}
         </div>
 
-        {loading ? (
+        {isLoading ? (
           <div className="mt-8 flex flex-col items-center gap-3 text-slate-400">
             <Loader2 className="h-8 w-8 animate-spin text-[#1b8659]" />
             <p className="text-sm font-semibold">Memuat data laporan...</p>
           </div>
-        ) : error ? (
-          <div className="mt-8 rounded-2xl bg-red-50 p-4 text-center text-sm font-semibold text-red-500">
-            {error}
+        ) : isError ? (
+          <div className="mt-8 rounded-2xl bg-red-50 p-4 text-center text-sm font-semibold text-red-500 flex items-center justify-center gap-2">
+            <AlertCircle className="h-4 w-4" />
+            {error?.message || "Terjadi kesalahan"}
           </div>
         ) : reports.length === 0 ? (
           <div className="mt-8 mb-8 flex flex-col items-center gap-3 text-slate-400">

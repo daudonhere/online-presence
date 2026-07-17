@@ -11,46 +11,36 @@ import {
 import Link from "next/link";
 import { DashboardLayout } from "@/components/layout";
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { Html5Qrcode } from "html5-qrcode";
 
 type ScanState = "idle" | "scanning" | "success" | "error" | "no-permission";
-type SubmitState = "idle" | "submitting" | "submitted" | "error";
 
 export default function ScanPage() {
   const [scanState, setScanState] = useState<ScanState>("idle");
   const [scannedResult, setScannedResult] = useState<string>("");
-  const [submitState, setSubmitState] = useState<SubmitState>("idle");
-  const [submitError, setSubmitError] = useState<string>("");
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
 
-  const handleSubmit = async () => {
-    if (!scannedResult || submitState === "submitting") return;
-    setSubmitState("submitting");
-    setSubmitError("");
-    try {
+  const submitMutation = useMutation({
+    mutationFn: async (qrData: string) => {
       const res = await fetch("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ qrData: scannedResult }),
+        body: JSON.stringify({ qrData }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        setSubmitState("error");
-        setSubmitError(data.error || "Gagal mengirim absensi.");
-        return;
-      }
-      setSubmitState("submitted");
+      if (!res.ok) throw new Error(data.error || "Gagal mengirim absensi.");
+      return data;
+    },
+    onSuccess: () => {
       try {
         const audio = new Audio("/icons/beep.mp3");
         audio.play().catch(() => {});
       } catch {}
-    } catch {
-      setSubmitState("error");
-      setSubmitError("Terjadi kesalahan jaringan. Coba lagi.");
-    }
-  };
+    },
+  });
 
   const stopScanner = useCallback(async () => {
     if (scannerRef.current && startedRef.current) {
@@ -117,6 +107,11 @@ export default function ScanPage() {
       stopScanner();
     };
   }, [startScanner, stopScanner]);
+
+  const handleSubmit = () => {
+    if (!scannedResult || submitMutation.isPending) return;
+    submitMutation.mutate(scannedResult);
+  };
 
   return (
     <DashboardLayout>
@@ -245,7 +240,7 @@ export default function ScanPage() {
           </div>
 
           <div className="relative mt-4 space-y-3">
-            {submitState === "submitted" ? (
+            {submitMutation.isSuccess ? (
               <div className="min-h-[58px] w-full rounded-2xl bg-[#1b8659] px-5 py-4 text-center text-base font-black text-white flex items-center justify-center gap-2 shadow-card">
                 <CheckCircle2 className="text-2xl" />
                 Absensi berhasil!
@@ -253,19 +248,19 @@ export default function ScanPage() {
             ) : (
               <>
                 <button
-                  disabled={scanState !== "success" || submitState === "submitting"}
+                  disabled={scanState !== "success" || submitMutation.isPending}
                   onClick={handleSubmit}
                   className="min-h-[58px] w-full rounded-2xl bg-[#ffff00] px-5 py-4 text-center text-base font-black text-[#003d7a] transition hover:scale-[0.98] flex items-center justify-center gap-2 shadow-card disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                 >
-                  {submitState === "submitting" ? (
+                  {submitMutation.isPending ? (
                     <Loader2 className="text-2xl animate-spin" />
                   ) : (
                     <CheckCircle2 className="text-2xl" />
                   )}
-                  {submitState === "submitting" ? "Mengirim..." : "Kirim Absensi"}
+                  {submitMutation.isPending ? "Mengirim..." : "Kirim Absensi"}
                 </button>
-                {submitState === "error" && (
-                  <p className="text-sm text-red-500 font-medium text-center">{submitError}</p>
+                {submitMutation.isError && (
+                  <p className="text-sm text-red-500 font-medium text-center">{submitMutation.error.message}</p>
                 )}
               </>
             )}

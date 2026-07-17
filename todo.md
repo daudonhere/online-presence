@@ -5,14 +5,14 @@
 | Phase | Status | Description |
 |-------|--------|-------------|
 | 0 | Done | Foundation (seed ✓, error handling, security) |
-| 1 | Done | Database setup (schema ✓, migration ✓, upload util ✓) |
+| 1 | Done | Database setup (Supabase PostgreSQL + Storage) |
 | 2 | Done | Auth (register/login/logout, middleware, session) |
 | 3 | Done | Core features (profile, attendance, obstacle, notifications) |
 | 4 | Done | Analytics & reports |
 | 5 | Pending | Admin dashboard (future) |
-| 6 | Done | Polish (Zod validation, lint fixes) |
+| 6 | Done | Polish (Zod, lint, React Query, PWA offline page) |
 | 7 | Pending | Testing |
-| 8 | Pending | Deployment |
+| 8 | Pending | Deployment (Vercel + Supabase) |
 
 ## MVP Scope (Phase 1-3)
 
@@ -32,53 +32,46 @@ Minimum Viable Product = guru bisa login, absen (QR/manual), submit halangan, li
 ## Phase 0: Foundation
 
 ### 0.1 Seed Data
-- [x] Create seed script (`prisma/seed.ts`)
+- [x] Create seed script (migrated to Supabase)
 - [x] Seed 1 admin user: phone `08123456789`, password `Tiger1SHA12@`, role `admin`
 - [x] Seed 2 teacher users: phone `081222222222` / `081333333333`, password `guru123`
 - [x] Seed profiles for each teacher (subject, nip, email)
 - [x] Seed notification preferences for each user
-- [x] Add `"seed": "npx tsx prisma/seed.ts"` to package.json scripts
 
 ### 0.2 Error Handling
 - [x] Create error response utility (`src/lib/api-response.ts`) — consistent `{ error: string, status: number }` format
 - [x] Add try/catch wrapper for all API routes (`withErrorHandling` HOF)
 - [x] Add error boundary: `error.tsx`, `not-found.tsx`, `global-error.tsx`
-- [x] Handle Prisma errors: P2002 (unique), P2003 (FK), P2025 (not found)
 - [x] Handle file upload errors: too large, wrong type, missing file
 
 ### 0.3 Security
 - [x] Hash passwords with bcryptjs (salt rounds: 10)
 - [x] Add rate limiting on auth routes (max 5 attempts per minute) — `src/lib/rate-limit.ts`
-- [x] Sanitize user input (strip HTML tags) — `sanitize()` in api-response.ts, applied via Zod `.transform()`
+- [x] Sanitize user input (strip HTML tags) — `sanitize()` in validations.ts, applied via Zod `.transform()`
 - [x] Validate file uploads: magic byte detection (JPEG/PNG/PDF) — `src/lib/upload.ts`
 - [x] Add CSRF protection (Auth.js handles this)
 - [x] Ensure user can only access their own data (check userId in session)
 
 ## Phase 1: Database Setup
 
-### 1.1 Prisma Schema
-- [x] Define `User` model (phone, password, name, role, qrToken)
-- [x] Define `Profile` model (userId, subject, nip, email, avatarUrl)
-- [x] Define `Attendance` model (userId, date, checkInTime, checkOutTime, notes, status, source)
-- [x] Define `Obstacle` model (userId, category, date, reason, fileUrl, status, reviewedBy, reviewedAt)
-- [x] Define `NotificationPreference` model (userId, reminderMasuk, reminderPulang, monthlySummary)
-- [x] Define `Report` model (title, period, fileUrl, status)
-- [x] Add relations: User→Profile (1:1), User→Attendance (1:N), User→Obstacle (1:N), User→NotificationPreference (1:1)
-- [x] Add `@@unique([userId, date])` on Attendance
-- [x] Run `npx prisma migrate dev --name init`
-- [x] Run `npx prisma generate`
+### 1.1 Database Schema (PostgreSQL via Supabase)
+- [x] Create PostgreSQL schema via Supabase SQL Editor (6 tables)
+- [x] Define `User` table (phone, password, name, role)
+- [x] Define `Profile` table (userId, subject, nip, email, avatarUrl)
+- [x] Define `Attendance` table (userId, date, checkInTime, checkOutTime, notes, status, source)
+- [x] Define `Obstacle` table (userId, category, date, reason, fileUrl, status, reviewedBy, reviewedAt)
+- [x] Define `NotificationPreference` table (userId, reminderMasuk, reminderPulang, monthlySummary)
+- [x] Define `Report` table (title, period, fileUrl, status)
+- [x] Add unique constraint: `Attendance(userId, date)`
 
 ### 1.2 File Upload Setup
-- [x] Create `public/uploads/avatars/` directory
-- [x] Create `public/uploads/obstacles/` directory
-- [x] Create `public/uploads/reports/` directory
-- [x] Create upload utility (`src/lib/upload.ts`) — handle file save, validate size (max 1MB avatar, max 1MB obstacle), magic byte MIME detection
+- [x] Configure Supabase Storage buckets: `avatars` (public), `obstacles` (public)
+- [x] Create upload utility (`src/lib/upload.ts`) — Supabase Storage upload, magic byte validation, size limits (1MB)
 
 ## Phase 2: Auth
 
 ### 2.1 Auth Configuration
 - [x] Install & configure Auth.js v5 (`src/lib/auth.ts`)
-- [x] Set up Prisma adapter for Auth.js (via BetterSqlite3 driver adapter)
 - [x] Configure credentials provider (phone + password)
 - [x] Create `src/app/api/auth/[...nextauth]/route.ts`
 - [x] Create `SessionProvider` wrapper in root layout
@@ -97,43 +90,44 @@ Minimum Viable Product = guru bisa login, absen (QR/manual), submit halangan, li
 ## Phase 3: Core Features
 
 ### 3.1 Profile
-- [x] `GET /api/profile` — get current user + profile
-- [x] `PUT /api/profile` — update biodata (name, subject, nip, email, phone), Zod validation
-- [x] `POST /api/profile/avatar` — upload avatar (max 1MB, jpg/png), save to `public/uploads/avatars/`
+- [x] `GET /api/profile` — get current user + profile (Supabase)
+- [x] `PUT /api/profile` — update biodata (name, subject, nip, email, phone), Zod validation (Supabase)
+- [x] `POST /api/profile/avatar` — upload avatar (max 1MB, jpg/png), save to Supabase Storage (`avatars` bucket)
 - [x] Update `/pengaturan` page to call real APIs
 
 ### 3.2 Attendance — Manual
-- [x] `POST /api/attendance` — create attendance record (source: "manual"), Zod validation
-- [x] `GET /api/attendance?month=&year=` — list attendance for current user
-- [x] `GET /api/attendance/last` — get last attendance status
-- [x] `POST /api/attendance/check-out` — update checkOutTime, Zod validation
-- [x] Update `/manual` page to call real APIs
+- [x] `POST /api/attendance` — create attendance record (source: "manual"), Zod validation (Supabase)
+- [x] `GET /api/attendance?month=&year=` — list attendance for current user (Supabase)
+- [x] `GET /api/attendance/last` — get last attendance status (Supabase)
+- [x] `POST /api/attendance/check-out` — update checkOutTime, Zod validation (Supabase)
+- [x] Update `/manual` page to call real APIs + React Query
 
 ### 3.3 Attendance — QR Scan
 - [x] Generate static QR code per teacher (encode `ATTENDANCE:USER:{id}:{name}`)
-- [x] `POST /api/scan` — validate qrData, create attendance (source: "qr"), Zod validation
+- [x] `POST /api/scan` — validate qrData, create attendance (source: "qr"), Zod validation (Supabase)
 - [x] Add QR display on homepage (`QrUserId.tsx` component, `qrcode.react`)
 - [x] Integrate QR scanning library in `/scan` page (`html5-qrcode`, live camera)
+- [x] Refactor `/scan` page with React Query
 
 ### 3.4 Obstacle (Halangan)
-- [x] `POST /api/obstacles` — create obstacle (date, category, reason), Zod validation
-- [x] `GET /api/obstacles` — list user's obstacles
-- [x] Update `/halangan/[category]` page to call real APIs
+- [x] `POST /api/obstacles` — create obstacle (date, category, reason), Zod validation (Supabase)
+- [x] `GET /api/obstacles` — list user's obstacles (Supabase)
+- [x] Update `/halangan/[category]` page to call real APIs + React Query
 
 ### 3.5 Notification Preferences
-- [x] `GET /api/notifications/preferences` — get preferences
-- [x] `PUT /api/notifications/preferences` — update toggles, Zod validation
+- [x] `GET /api/notifications/preferences` — get preferences (Supabase)
+- [x] `PUT /api/notifications/preferences` — update toggles, Zod validation (Supabase)
 - [x] Update `/pengaturan` notification toggles to call real APIs
 
 ## Phase 4: Analytics & Reports
 
 ### 4.1 Attendance Analysis
-- [x] `GET /api/attendance/analysis?month=&year=` — calculate percentage, weekly breakdown, daily chart data
-- [x] Update `/analisa` page to call real API (replace hardcoded data)
+- [x] `GET /api/attendance/analysis?month=&year=` — calculate percentage, weekly breakdown, daily chart data (Supabase)
+- [x] Update `/analisa` page to call real API (replace hardcoded data) + React Query
 
 ### 4.2 Reports
-- [x] `GET /api/reports?month=&year=` — list reports
-- [x] `/laporan` page with custom dropdown styling, PDF export, Excel export
+- [x] `GET /api/reports?month=&year=` — list reports (Supabase)
+- [x] `/laporan` page with custom dropdown styling, PDF export, Excel export + React Query
 - [x] `POST /api/reports/generate` — admin: generate report file (HTML + CSV)
 - [x] `GET /api/reports/:id/download` — download report file
 
@@ -150,7 +144,7 @@ Minimum Viable Product = guru bisa login, absen (QR/manual), submit halangan, li
 ## Phase 6: Polish
 
 ### 6.1 Validation
-- [x] Create Zod schemas for all form inputs (`src/lib/validations.ts`)
+- [x] Create Zod schemas for all form inputs (`src/lib/validations.ts`) + `sanitize()` function
 - [x] Add server-side validation on all API routes (7 routes: register, profile, attendance, check-out, scan, obstacles, notifications)
 - [x] Add client-side validation with error messages (`useFormValidation` hook + `FieldError` component)
 
@@ -159,16 +153,22 @@ Minimum Viable Product = guru bisa login, absen (QR/manual), submit halangan, li
 - [x] Fix `react-hooks/exhaustive-deps` in `/laporan`
 - [x] Remove unused `router` import in `/pengaturan`
 - [x] Suppress `@next/next/no-img-element` in avatar display
+- [x] Refactored all pages to React Query (eliminated manual useEffect fetch patterns)
 
 ### 6.3 State Management
-- [ ] Set up React Query for server state (attendance, profile, obstacles)
-- [ ] Create query keys constants
-- [ ] Add loading states and error handling to all pages
+- [x] Install & configure React Query (`@tanstack/react-query`) via `Providers` component
+- [x] Create query keys constants (`src/lib/query-keys.ts`) — attendance, analysis, reports, profile, notifications, obstacles
+- [x] Refactor `/analisa` page — `useQuery` for analysis data
+- [x] Refactor `/laporan` page — `useQuery` for reports list
+- [x] Refactor `/manual` page — `useQuery` for last attendance + month records, `useMutation` for check-in/check-out
+- [x] Refactor `/scan` page — `useMutation` for QR submit
+- [x] Refactor `/pengaturan` page — `useQuery` for profile + notifications, `useMutation` for save profile, avatar upload, notification toggle
+- [x] Refactor `/halangan/[category]` page — `useMutation` for obstacle submit
 
 ### 6.4 PWA
 - [ ] Test service worker in production build
 - [ ] Test install prompt flow
-- [ ] Add offline fallback page
+- [x] Add offline fallback page (`src/app/offline/page.tsx`)
 
 ## Phase 7: Testing
 
@@ -192,27 +192,29 @@ Minimum Viable Product = guru bisa login, absen (QR/manual), submit halangan, li
 ## Phase 8: Deployment
 
 ### 8.1 Pre-deploy
-- [ ] Environment variables for production (DATABASE_URL, AUTH_SECRET, AUTH_URL)
-- [ ] Run `npx prisma migrate deploy` in production
+- [x] Set up Supabase project (PostgreSQL + Storage)
+- [x] Migrate all API routes from Prisma to Supabase (`@supabase/supabase-js`)
+- [x] Remove Prisma, SQLite, Turso dependencies
+- [x] Configure Supabase buckets: `avatars` (public), `obstacles` (public)
+- [ ] Set environment variables in Vercel (`SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `AUTH_SECRET`, `AUTH_URL`)
 - [ ] Build with `npm run build`
-- [ ] Test all critical flows in production-like environment
+- [ ] Test all critical flows in production
 
 ### 8.2 Production Checklist
 - [ ] HTTPS enabled (required for PWA + service worker)
-- [ ] Database file backed up (SQLite: copy `prisma/dev.db`)
-- [ ] Upload directories writable
 - [ ] Service worker registered and active
 - [ ] Auth session working (check AUTH_SECRET)
+- [ ] Supabase Storage buckets accessible (avatars, obstacles)
 
 ---
 
 ## File Upload Limits
 
-| Type | Max Size | Allowed Formats | Path |
-|------|----------|-----------------|------|
-| Avatar | 1 MB | .jpg, .jpeg, .png | `public/uploads/avatars/` |
-| Obstacle bukti | 1 MB | .pdf, .jpg, .jpeg, .png | `public/uploads/obstacles/` |
-| Report file | — | .pdf, .xlsx | `public/uploads/reports/` |
+| Type | Max Size | Allowed Formats | Storage |
+|------|----------|-----------------|---------|
+| Avatar | 1 MB | .jpg, .jpeg, .png | Supabase Storage (`avatars` bucket) |
+| Obstacle bukti | 1 MB | .pdf, .jpg, .jpeg, .png | Supabase Storage (`obstacles` bucket) |
+| Report file | — | .html, .csv | Filesystem (server-side generation) |
 
 ## Zod Schemas (`src/lib/validations.ts`)
 
@@ -227,7 +229,7 @@ Minimum Viable Product = guru bisa login, absen (QR/manual), submit halangan, li
 | `notificationPrefsSchema` | reminderMasuk?, reminderPulang?, monthlySummary? |
 | `scanSchema` | qrData (regex: `ATTENDANCE:USER:{id}:{name}`) |
 
-## Database Schema Summary
+## Database Schema Summary (PostgreSQL via Supabase)
 
 ### User
 ```

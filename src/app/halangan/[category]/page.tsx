@@ -4,6 +4,7 @@ import { ArrowLeft, ShieldCheck, Info, UploadCloud, Send, Loader2 } from "lucide
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useState } from "react";
+import { useMutation } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/layout";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { useFormValidation, FieldError } from "@/lib/hooks";
@@ -44,10 +45,30 @@ export default function HalanganFormPage() {
   const [charCount, setCharCount] = useState(0);
   const [confirmed, setConfirmed] = useState(false);
   const [file, setFile] = useState<File | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const { errors, validate, clearField } = useFormValidation(obstacleSchema);
+
+  const submitMutation = useMutation({
+    mutationFn: async (formData: FormData) => {
+      const res = await fetch("/api/obstacles", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal mengirim pengajuan.");
+      return data;
+    },
+    onSuccess: () => {
+      setSuccess(true);
+      setDate("");
+      setReason("");
+      setCharCount(0);
+      setConfirmed(false);
+      setFile(null);
+      const fileInput = document.getElementById("file-bukti") as HTMLInputElement | null;
+      if (fileInput) fileInput.value = "";
+    },
+  });
 
   const handleReasonChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value.slice(0, 250);
@@ -61,57 +82,21 @@ export default function HalanganFormPage() {
     setFile(selected);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
     setSuccess(false);
 
-    if (!validate({ date, category, reason })) {
-      return;
-    }
+    if (!validate({ date, category, reason })) return;
+    if (!confirmed) return;
 
-    if (!confirmed) {
-      setError("Konfirmasi data wajib dicentang.");
-      return;
-    }
+    const formData = new FormData();
+    formData.append("date", date);
+    formData.append("category", category);
+    formData.append("reason", reason);
+    if (file) formData.append("file", file);
 
-    setLoading(true);
-
-    try {
-      const formData = new FormData();
-      formData.append("date", date);
-      formData.append("category", category);
-      formData.append("reason", reason);
-      if (file) {
-        formData.append("file", file);
-      }
-
-      const res = await fetch("/api/obstacles", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Gagal mengirim pengajuan.");
-      }
-
-      setSuccess(true);
-      setDate("");
-      setReason("");
-      setCharCount(0);
-      setConfirmed(false);
-      setFile(null);
-
-      const fileInput = document.getElementById("file-bukti") as HTMLInputElement | null;
-      if (fileInput) fileInput.value = "";
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Terjadi kesalahan. Silakan coba lagi.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    submitMutation.mutate(formData);
+  }
 
   return (
     <DashboardLayout>
@@ -162,9 +147,9 @@ export default function HalanganFormPage() {
           </div>
         )}
 
-        {error && (
+        {submitMutation.isError && (
           <div className="mt-4 rounded-2xl bg-red-50 p-4 ring-1 ring-red-200">
-            <p className="text-sm font-bold text-red-700">{error}</p>
+            <p className="text-sm font-bold text-red-700">{submitMutation.error.message}</p>
           </div>
         )}
 
@@ -276,10 +261,10 @@ export default function HalanganFormPage() {
 
           <button
             type="submit"
-            disabled={loading || !confirmed}
+            disabled={submitMutation.isPending || !confirmed}
             className="min-h-[58px] w-full rounded-2xl bg-[#ffff00] px-5 py-4 text-base font-black text-[#003d7a] shadow-card transition hover:scale-[0.98] disabled:opacity-60 disabled:hover:scale-100 flex items-center justify-center gap-2"
           >
-            {loading ? (
+            {submitMutation.isPending ? (
               <>
                 <Loader2 className="text-2xl animate-spin" />
                 Mengirim...

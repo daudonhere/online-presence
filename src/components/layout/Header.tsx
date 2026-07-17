@@ -1,7 +1,8 @@
 "use client";
 
-import { Bell, Clock } from "lucide-react";
+import { Clock } from "lucide-react";
 import { useSession } from "next-auth/react";
+import { NotificationBell } from "@/components/ui/NotificationBell";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -40,12 +41,7 @@ export function Header() {
               <span>{getCurrentTime()}</span>
             </div>
           </div>
-          <button
-            className="min-h-[44px] min-w-[44px] rounded-2xl bg-white/15 flex items-center justify-center ring-1 ring-white/20 transition hover:bg-white/25"
-            aria-label="Notifikasi"
-          >
-            <Bell className="text-xl text-white" />
-          </button>
+          <NotificationBell />
         </div>
       </div>
     </header>

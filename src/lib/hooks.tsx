@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { z, ZodSchema } from "zod";
+import { type ZodSchema } from "zod";
 
 type Errors = Record<string, string>;
 

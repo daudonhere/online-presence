@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import {
   BarChart3,
   TrendingUp,
@@ -10,9 +9,13 @@ import {
   CalendarRange,
   FileDown,
   ArrowRight,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { DashboardLayout } from "@/components/layout";
+import { useQuery } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/query-keys";
 
 interface DayStatus {
   day: string;
@@ -57,26 +60,37 @@ function getDayBg(status: string) {
 }
 
 export default function AnalisaPage() {
-  const [data, setData] = useState<AnalysisData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const year = now.getFullYear();
 
-  useEffect(() => {
-    const now = new Date();
-    const month = now.getMonth() + 1;
-    const year = now.getFullYear();
+  const { data, isLoading, isError } = useQuery<AnalysisData>({
+    queryKey: queryKeys.analysis(month, year),
+    queryFn: async () => {
+      const res = await fetch(`/api/attendance/analysis?month=${month}&year=${year}`);
+      if (!res.ok) throw new Error("Gagal memuat data analisa");
+      return res.json();
+    },
+  });
 
-    fetch(`/api/attendance/analysis?month=${month}&year=${year}`)
-      .then((res) => res.json())
-      .then((json) => setData(json))
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (loading || !data) {
+  if (isLoading) {
     return (
       <DashboardLayout>
         <section className="w-full max-w-md mx-auto flex items-center justify-center min-h-[60vh]">
-          <p className="text-slate-500 font-medium">Memuat data...</p>
+          <Loader2 className="h-6 w-6 animate-spin text-[#1b8659]" />
+        </section>
+      </DashboardLayout>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <DashboardLayout>
+        <section className="w-full max-w-md mx-auto flex items-center justify-center min-h-[60vh]">
+          <div className="flex flex-col items-center gap-3 text-center">
+            <AlertCircle className="h-10 w-10 text-red-400" />
+            <p className="text-sm font-semibold text-slate-600">Gagal memuat data analisa</p>
+          </div>
         </section>
       </DashboardLayout>
     );

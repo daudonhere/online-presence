@@ -10,10 +10,12 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/layout";
 import { DatePicker } from "@/components/ui/DatePicker";
 import { useFormValidation, FieldError } from "@/lib/hooks";
 import { attendanceSchema } from "@/lib/validations";
+import { queryKeys } from "@/lib/query-keys";
 
 interface AttendanceRecord {
   id: number;
@@ -51,55 +53,95 @@ function getTodayDate(): string {
 
 export default function ManualPage() {
   const today = getTodayDate();
+  const now = new Date();
+  const queryClient = useQueryClient();
 
   const [date, setDate] = useState(today);
   const [time, setTime] = useState(getCurrentTime());
   const [notes, setNotes] = useState("");
-
-  const [lastAttendance, setLastAttendance] = useState<AttendanceRecord | null>(null);
-  const [todayAttendance, setTodayAttendance] = useState<AttendanceRecord | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const { errors, validate, clearField } = useFormValidation(attendanceSchema);
 
+  const { data: lastAttendance, isLoading: loadingLast } = useQuery<AttendanceRecord | null>({
+    queryKey: queryKeys.attendance.last,
+    queryFn: async () => {
+      const res = await fetch("/api/attendance/last");
+      if (!res.ok) return null;
+      const data = await res.json();
+      const last = data?.attendance ?? data;
+      return last && typeof last === "object" && last.date ? last : null;
+    },
+  });
+
+  const { data: monthRecords, isLoading: loadingMonth } = useQuery<AttendanceRecord[]>({
+    queryKey: queryKeys.attendance.list(now.getMonth() + 1, now.getFullYear()),
+    queryFn: async () => {
+      const res = await fetch(`/api/attendance?month=${now.getMonth() + 1}&year=${now.getFullYear()}`);
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data?.attendance ?? (Array.isArray(data) ? data : []);
+    },
+  });
+
+  const todayAttendance = monthRecords?.find((r) => r.date === today) ?? null;
   const isCheckedInToday = todayAttendance?.status === "hadir" || todayAttendance?.status === "izin";
   const hasCheckedOut = todayAttendance?.checkOutTime != null;
 
-  useEffect(() => {
-    async function fetchAttendance() {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const [lastRes, todayRes] = await Promise.all([
-          fetch("/api/attendance/last"),
-          fetch(`/api/attendance?month=${new Date().getMonth() + 1}&year=${new Date().getFullYear()}`),
-        ]);
-
-        if (lastRes.ok) {
-          const lastData = await lastRes.json();
-          const last = lastData?.attendance ?? lastData;
-          setLastAttendance(last && typeof last === "object" && last.date ? last : null);
+  const checkInMutation = useMutation({
+    mutationFn: async (payload: { date: string; time: string; notes?: string }) => {
+      const res = await fetch("/api/attendance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Gagal mengirim absensi.");
+      return data.attendance ?? { ...data, checkOutTime: null };
+    },
+    onSuccess: (newRecord: AttendanceRecord) => {
+      queryClient.setQueryData<AttendanceRecord[]>(
+        queryKeys.attendance.list(now.getMonth() + 1, now.getFullYear()),
+        (old) => {
+          if (!old) return [newRecord];
+          const idx = old.findIndex((r) => r.date === newRecord.date);
+          if (idx >= 0) {
+            const next = [...old];
+            next[idx] = newRecord;
+            return next;
+          }
+          return [...old, newRecord];
         }
+      );
+      setSuccess("Absensi terkirim! Menunggu persetujuan admin.");
+      setConfirmed(false);
+    },
+  });
 
-        if (todayRes.ok) {
-          const todayData = await todayRes.json();
-          const records: AttendanceRecord[] = todayData?.attendance ?? (Array.isArray(todayData) ? todayData : []);
-          const todayRecord = records.find((r) => r.date === today) ?? null;
-          setTodayAttendance(todayRecord);
+  const checkOutMutation = useMutation({
+    mutationFn: async (time: string) => {
+      const res = await fetch("/api/attendance/check-out", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ time }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Gagal melakukan check-out.");
+      return data;
+    },
+    onSuccess: (data: { checkOutTime?: string }) => {
+      queryClient.setQueryData<AttendanceRecord[]>(
+        queryKeys.attendance.list(now.getMonth() + 1, now.getFullYear()),
+        (old) => {
+          if (!old) return old;
+          return old.map((r) =>
+            r.date === today ? { ...r, checkOutTime: data.checkOutTime ?? getCurrentTime() } : r
+          );
         }
-      } catch {
-        setError("Gagal memuat data kehadiran.");
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchAttendance();
-  }, [today]);
+      );
+      setSuccess("Berhasil check-out!");
+    },
+  });
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -109,79 +151,28 @@ export default function ManualPage() {
   }, []);
 
   function resetMessages() {
-    setError(null);
     setSuccess(null);
   }
 
-  async function handleCheckIn(e: React.FormEvent) {
+  function handleCheckIn(e: React.FormEvent) {
     e.preventDefault();
     resetMessages();
-
     const submitTime = getCurrentTime();
     setTime(submitTime);
-
-    if (!validate({ date, time: submitTime, notes: notes || undefined })) {
-      return;
-    }
-
-    setSubmitting(true);
-
-    try {
-      const res = await fetch("/api/attendance", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, time: submitTime, notes: notes || undefined }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error ?? "Gagal mengirim absensi.");
-        return;
-      }
-
-      setTodayAttendance(data.attendance ?? { ...data, checkOutTime: null });
-      setSuccess("Absensi terkirim! Menunggu persetujuan admin.");
-      setConfirmed(false);
-    } catch {
-      setError("Terjadi kesalahan saat mengirim data.");
-    } finally {
-      setSubmitting(false);
-    }
+    if (!validate({ date, time: submitTime, notes: notes || undefined })) return;
+    checkInMutation.mutate({ date, time: submitTime, notes: notes || undefined });
   }
 
-  async function handleCheckOut() {
+  function handleCheckOut() {
     resetMessages();
-    setSubmitting(true);
-
-    try {
-      const res = await fetch("/api/attendance/check-out", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ time: getCurrentTime() }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        setError(data.error ?? "Gagal melakukan check-out.");
-        return;
-      }
-
-      setTodayAttendance((prev) =>
-        prev ? { ...prev, checkOutTime: data.checkOutTime ?? getCurrentTime() } : prev
-      );
-      setSuccess("Berhasil check-out!");
-    } catch {
-      setError("Terjadi kesalahan saat check-out.");
-    } finally {
-      setSubmitting(false);
-    }
+    checkOutMutation.mutate(getCurrentTime());
   }
 
-  const statusKey = todayAttendance
-    ? todayAttendance.status
-    : "menunggu";
+  const loading = loadingLast || loadingMonth;
+  const isSubmitting = checkInMutation.isPending || checkOutMutation.isPending;
+  const errorMsg = checkInMutation.error?.message || checkOutMutation.error?.message || null;
+
+  const statusKey = todayAttendance ? todayAttendance.status : "menunggu";
   const statusDisplay = STATUS_CONFIG[statusKey] ?? STATUS_CONFIG.menunggu;
 
   return (
@@ -301,8 +292,8 @@ export default function ManualPage() {
           </div>
         </div>
 
-        {error && (
-          <p className="mt-3 text-center text-sm font-bold text-red-600">{error}</p>
+        {errorMsg && (
+          <p className="mt-3 text-center text-sm font-bold text-red-600">{errorMsg}</p>
         )}
         {success && (
           <p className="mt-3 text-center text-sm font-bold text-emerald-600">{success}</p>
@@ -310,10 +301,10 @@ export default function ManualPage() {
 
         <button
           type="submit"
-          disabled={submitting || isCheckedInToday || !confirmed}
+          disabled={isSubmitting || isCheckedInToday || !confirmed}
           className="mt-4 min-h-[58px] w-full rounded-2xl bg-[#1b8659] px-5 py-4 text-center text-base font-black text-[#ffff00] shadow-card transition hover:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:hover:scale-100"
         >
-          {submitting ? (
+          {isSubmitting ? (
             <Loader2 className="text-2xl animate-spin" />
           ) : (
             <Send className="text-2xl" />
@@ -324,11 +315,11 @@ export default function ManualPage() {
         {isCheckedInToday && !hasCheckedOut && (
           <button
             type="button"
-            disabled={submitting}
+            disabled={isSubmitting}
             onClick={handleCheckOut}
             className="mt-3 min-h-[54px] w-full rounded-2xl border-2 border-[#1b8659] bg-white px-5 py-4 text-center text-base font-black text-[#1b8659] transition hover:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:hover:scale-100"
           >
-            {submitting ? (
+            {isSubmitting ? (
               <Loader2 className="text-xl animate-spin" />
             ) : (
               <Clock className="text-xl" />

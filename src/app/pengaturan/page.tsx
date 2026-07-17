@@ -16,9 +16,11 @@ import {
   CheckCircle2,
   AlertCircle,
 } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { useRef, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/layout";
+import { queryKeys } from "@/lib/query-keys";
 
 const toggles = [
   {
@@ -27,19 +29,33 @@ const toggles = [
     description: "Dikirim sebelum jam 07.00 WIB",
   },
   {
-    key: "reminderPulang" as const,
-    label: "Pengingat Absen Pulang",
-    description: "Dikirim setelah jam mengajar selesai",
-  },
-  {
     key: "monthlySummary" as const,
     label: "Ringkasan Bulanan",
     description: "Laporan singkat setiap akhir bulan",
   },
 ];
 
+interface ProfileData {
+  name: string;
+  phone: string;
+  profile?: {
+    subject?: string;
+    nip?: string;
+    email?: string;
+    avatarUrl?: string;
+  };
+}
+
+interface NotifData {
+  reminderMasuk: boolean;
+  reminderPulang: boolean;
+  monthlySummary: boolean;
+}
+
 export default function PengaturanPage() {
   const { data: session } = useSession();
+  const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [profile, setProfile] = useState({
     name: "",
@@ -52,99 +68,71 @@ export default function PengaturanPage() {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [password, setPassword] = useState("");
   const [retypePassword, setRetypePassword] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
   const [notifStates, setNotifStates] = useState({
     reminderMasuk: true,
-    reminderPulang: true,
     monthlySummary: false,
   });
-
-  const [loading, setLoading] = useState(true);
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [savingNotif, setSavingNotif] = useState(false);
-
   const [profileMsg, setProfileMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [avatarMsg, setAvatarMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [notifMsg, setNotifMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const [profileRes, notifRes] = await Promise.all([
-          fetch("/api/profile"),
-          fetch("/api/notifications/preferences"),
-        ]);
-
-        if (profileRes.ok) {
-          const profileData = await profileRes.json();
-          setProfile({
-            name: profileData.name || "",
-            subject: profileData.profile?.subject || "",
-            nip: profileData.profile?.nip || "",
-            email: profileData.profile?.email || "",
-            phone: profileData.phone || "",
-          });
-          if (profileData.profile?.avatarUrl) {
-            setProfileImage(profileData.profile.avatarUrl);
-          }
-        }
-
-        if (notifRes.ok) {
-          const notifData = await notifRes.json();
-          setNotifStates({
-            reminderMasuk: notifData.reminderMasuk ?? true,
-            reminderPulang: notifData.reminderPulang ?? true,
-            monthlySummary: notifData.monthlySummary ?? false,
-          });
-        }
-      } catch {
-        // silent — defaults are fine
-      } finally {
-        setLoading(false);
+  const { isLoading: loading } = useQuery<ProfileData>({
+    queryKey: queryKeys.profile,
+    queryFn: async () => {
+      const res = await fetch("/api/profile");
+      if (!res.ok) throw new Error("Gagal memuat profil");
+      const data = await res.json();
+      setProfile({
+        name: data.name || "",
+        subject: data.profile?.subject || "",
+        nip: data.profile?.nip || "",
+        email: data.profile?.email || "",
+        phone: data.phone || "",
+      });
+      if (data.profile?.avatarUrl) {
+        setProfileImage(data.profile.avatarUrl);
       }
-    }
-    fetchData();
-  }, []);
+      return data;
+    },
+  });
 
-  const handleProfileChange = (field: string, value: string) => {
-    setProfile((prev) => ({ ...prev, [field]: value }));
-  };
+  useQuery<NotifData>({
+    queryKey: queryKeys.notificationPrefs,
+    queryFn: async () => {
+      const res = await fetch("/api/notifications/preferences");
+      if (!res.ok) throw new Error("Gagal memuat notifikasi");
+      const data = await res.json();
+      setNotifStates({
+        reminderMasuk: data.reminderMasuk ?? true,
+        monthlySummary: data.monthlySummary ?? false,
+      });
+      return data;
+    },
+  });
 
-  const handleSaveProfile = async () => {
-    setSavingProfile(true);
-    setProfileMsg(null);
-    try {
+  const saveProfileMutation = useMutation({
+    mutationFn: async (data: typeof profile) => {
       const res = await fetch("/api/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(profile),
+        body: JSON.stringify(data),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setProfileMsg({ type: "error", text: data.error || "Gagal menyimpan profil" });
-      } else {
-        setProfileMsg({ type: "success", text: "Profil berhasil disimpan" });
-      }
-    } catch {
-      setProfileMsg({ type: "error", text: "Terjadi kesalahan jaringan" });
-    } finally {
-      setSavingProfile(false);
-    }
-  };
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Gagal menyimpan profil");
+      return result;
+    },
+    onSuccess: () => {
+      setProfileMsg({ type: "success", text: "Profil berhasil disimpan" });
+      queryClient.invalidateQueries({ queryKey: queryKeys.profile });
+    },
+    onError: (error: Error) => {
+      setProfileMsg({ type: "error", text: error.message });
+    },
+  });
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > 1024 * 1024) {
-      setAvatarMsg({ type: "error", text: "Ukuran gambar maksimal 1 MB" });
-      return;
-    }
-
-    setUploadingAvatar(true);
-    setAvatarMsg(null);
-    try {
+  const uploadAvatarMutation = useMutation({
+    mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append("avatar", file);
       const res = await fetch("/api/profile/avatar", {
@@ -152,43 +140,68 @@ export default function PengaturanPage() {
         body: formData,
       });
       const data = await res.json();
-      if (!res.ok) {
-        setAvatarMsg({ type: "error", text: data.error || "Gagal upload avatar" });
-      } else {
-        setProfileImage(data.avatarUrl);
-        setAvatarMsg({ type: "success", text: "Avatar berhasil diunggah" });
-      }
-    } catch {
-      setAvatarMsg({ type: "error", text: "Terjadi kesalahan jaringan" });
-    } finally {
-      setUploadingAvatar(false);
-    }
-  };
+      if (!res.ok) throw new Error(data.error || "Gagal upload avatar");
+      return data;
+    },
+    onSuccess: (data: { avatarUrl: string }) => {
+      setProfileImage(data.avatarUrl);
+      setAvatarMsg({ type: "success", text: "Avatar berhasil diunggah" });
+      queryClient.invalidateQueries({ queryKey: queryKeys.profile });
+    },
+    onError: (error: Error) => {
+      setAvatarMsg({ type: "error", text: error.message });
+    },
+  });
 
-  const toggleNotif = async (key: keyof typeof notifStates) => {
-    const newState = { ...notifStates, [key]: !notifStates[key] };
-    setNotifStates(newState);
-    setSavingNotif(true);
-    setNotifMsg(null);
-    try {
+  const saveNotifMutation = useMutation({
+    mutationFn: async (data: typeof notifStates) => {
       const res = await fetch("/api/notifications/preferences", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newState),
+        body: JSON.stringify(data),
       });
-      const data = await res.json();
-      if (!res.ok) {
-        setNotifMsg({ type: "error", text: data.error || "Gagal menyimpan preferensi" });
-        setNotifStates((prev) => ({ ...prev, [key]: !newState[key] }));
-      } else {
-        setNotifMsg({ type: "success", text: "Preferensi notifikasi disimpan" });
-      }
-    } catch {
-      setNotifMsg({ type: "error", text: "Terjadi kesalahan jaringan" });
-      setNotifStates((prev) => ({ ...prev, [key]: !newState[key] }));
-    } finally {
-      setSavingNotif(false);
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Gagal menyimpan preferensi");
+      return result;
+    },
+    onSuccess: () => {
+      setNotifMsg({ type: "success", text: "Preferensi notifikasi disimpan" });
+      queryClient.invalidateQueries({ queryKey: queryKeys.notificationPrefs });
+    },
+    onError: (error: Error, variables) => {
+      setNotifMsg({ type: "error", text: error.message });
+      setNotifStates((prev) => {
+        const key = Object.keys(variables)[0] as keyof typeof notifStates;
+        return { ...prev, [key]: !variables[key] };
+      });
+    },
+  });
+
+  const handleProfileChange = (field: string, value: string) => {
+    setProfile((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSaveProfile = () => {
+    setProfileMsg(null);
+    saveProfileMutation.mutate(profile);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 1024 * 1024) {
+      setAvatarMsg({ type: "error", text: "Ukuran gambar maksimal 1 MB" });
+      return;
     }
+    setAvatarMsg(null);
+    uploadAvatarMutation.mutate(file);
+  };
+
+  const toggleNotif = (key: keyof typeof notifStates) => {
+    const newState = { ...notifStates, [key]: !notifStates[key] };
+    setNotifStates(newState);
+    setNotifMsg(null);
+    saveNotifMutation.mutate(newState);
   };
 
   const handlePasswordSubmit = () => {
@@ -219,10 +232,10 @@ export default function PengaturanPage() {
         <div className="relative flex items-center gap-4">
           <button
             onClick={() => fileInputRef.current?.click()}
-            disabled={uploadingAvatar}
+            disabled={uploadAvatarMutation.isPending}
             className="h-20 w-20 shrink-0 rounded-[26px] bg-white p-1 shadow-card ring-4 ring-[#ffff00]/40 relative group cursor-pointer disabled:opacity-50"
           >
-            {uploadingAvatar ? (
+            {uploadAvatarMutation.isPending ? (
               <div className="h-full w-full rounded-[22px] bg-gradient-to-br from-emerald-100 to-white flex items-center justify-center overflow-hidden">
                 <Loader2 className="text-2xl text-[#1b8659] animate-spin" />
               </div>
@@ -357,10 +370,10 @@ export default function PengaturanPage() {
 
         <button
           onClick={handleSaveProfile}
-          disabled={savingProfile || loading}
+          disabled={saveProfileMutation.isPending || loading}
           className="mt-4 min-h-[54px] w-full rounded-2xl bg-[#1b8659] px-5 py-3 text-sm font-black text-[#ffff00] shadow-card transition hover:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
         >
-          {savingProfile ? (
+          {saveProfileMutation.isPending ? (
             <Loader2 className="text-xl animate-spin" />
           ) : (
             "Simpan Profil"
@@ -425,7 +438,7 @@ export default function PengaturanPage() {
               </div>
               <button
                 onClick={() => toggleNotif(item.key)}
-                disabled={savingNotif}
+                disabled={saveNotifMutation.isPending}
                 className={`min-h-[32px] w-14 rounded-full p-1 flex transition disabled:opacity-50 ${
                   notifStates[item.key]
                     ? "bg-[#1b8659] justify-end"
@@ -448,11 +461,12 @@ export default function PengaturanPage() {
 
       <section className="mt-4 rounded-[28px] bg-white p-4 shadow-card ring-1 ring-red-100">
         <button
-          onClick={() => signOut({ callbackUrl: "/auth" })}
-          className="min-h-[60px] w-full flex items-center justify-center gap-3 rounded-2xl bg-red-50 px-5 py-4 text-base font-black text-red-600 transition hover:scale-[0.99] hover:bg-red-100"
+          onClick={() => { setLoggingOut(true); signOut({ callbackUrl: "/auth" }); }}
+          disabled={loggingOut}
+          className="min-h-[60px] w-full flex items-center justify-center gap-3 rounded-2xl bg-red-50 px-5 py-4 text-base font-black text-red-600 transition hover:scale-[0.99] hover:bg-red-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
         >
-          <LogOut className="text-2xl" />
-          Keluar dari Akun
+          {loggingOut ? <Loader2 className="text-2xl animate-spin" /> : <LogOut className="text-2xl" />}
+          {loggingOut ? "Sedang keluar..." : "Keluar dari Akun"}
         </button>
       </section>
 
