@@ -66,8 +66,11 @@ export default function PengaturanPage() {
   });
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
   const [password, setPassword] = useState("");
   const [retypePassword, setRetypePassword] = useState("");
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordMsg, setPasswordMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [notifStates, setNotifStates] = useState({
     reminderMasuk: true,
     monthlySummary: false,
@@ -204,19 +207,39 @@ export default function PengaturanPage() {
     saveNotifMutation.mutate(newState);
   };
 
-  const handlePasswordSubmit = () => {
+  const handlePasswordSubmit = async () => {
+    setPasswordMsg(null);
+    if (!currentPassword) {
+      setPasswordMsg({ type: "error", text: "Password lama wajib diisi" });
+      return;
+    }
     if (password !== retypePassword) {
-      alert("Password tidak cocok");
+      setPasswordMsg({ type: "error", text: "Password baru tidak cocok" });
       return;
     }
     if (password.length < 6) {
-      alert("Password minimal 6 karakter");
+      setPasswordMsg({ type: "error", text: "Password baru minimal 6 karakter" });
       return;
     }
-    setShowPasswordModal(false);
-    setPassword("");
-    setRetypePassword("");
-    alert("Password berhasil diubah");
+    setPasswordLoading(true);
+    try {
+      const res = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword, newPassword: password }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal mengubah password");
+      setPasswordMsg({ type: "success", text: "Password berhasil diubah" });
+      setShowPasswordModal(false);
+      setCurrentPassword("");
+      setPassword("");
+      setRetypePassword("");
+    } catch (e: unknown) {
+      setPasswordMsg({ type: "error", text: e instanceof Error ? e.message : "Gagal mengubah password" });
+    } finally {
+      setPasswordLoading(false);
+    }
   };
 
   const displayName = profile.name || session?.user?.name || "Guru";
@@ -397,17 +420,15 @@ export default function PengaturanPage() {
           onClick={() => setShowPasswordModal(true)}
           className="mt-4 min-h-[58px] w-full flex items-center justify-between gap-4 rounded-2xl bg-gradient-to-r from-slate-50 to-emerald-50 px-4 py-3 transition hover:scale-[0.99]"
         >
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-[#1b8659] flex items-center justify-center">
-              <KeyRound className="text-xl text-[#ffff00]" />
+            <div className="flex items-center gap-3 text-left">
+              <div className="h-10 w-10 shrink-0 rounded-xl bg-[#1b8659] flex items-center justify-center">
+                <KeyRound className="text-xl text-[#ffff00]" />
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-bold text-slate-950">Ubah Password</p>
+                <p className="text-xs text-slate-500">Ubah password akun Anda</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-bold text-slate-950">Ubah Password</p>
-              <p className="text-xs text-slate-500">
-                Terakhir diubah 12 hari lalu
-              </p>
-            </div>
-          </div>
           <ChevronRight className="text-xl text-slate-400" />
         </button>
       </section>
@@ -479,14 +500,19 @@ export default function PengaturanPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-sm rounded-[28px] bg-white p-5 shadow-card">
             <div className="flex items-center justify-between">
-              <h3 className="font-display text-xl font-bold tracking-tight text-slate-950">
-                Ubah Password
-              </h3>
+              <div>
+                <h3 className="font-display text-xl font-bold tracking-tight text-slate-950">
+                  Ubah Password
+                </h3>
+                <p className="text-xs text-slate-500">Ubah password akun Anda</p>
+              </div>
               <button
                 onClick={() => {
                   setShowPasswordModal(false);
+                  setCurrentPassword("");
                   setPassword("");
                   setRetypePassword("");
+                  setPasswordMsg(null);
                 }}
                 className="h-10 w-10 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition"
               >
@@ -495,6 +521,18 @@ export default function PengaturanPage() {
             </div>
 
             <div className="mt-5 space-y-4">
+              <div>
+                <label className="text-sm font-bold text-slate-900">
+                  Password Lama
+                </label>
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="mt-2 min-h-[54px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-base font-semibold text-slate-900 outline-none transition focus:border-[#1b8659] focus:bg-white focus:ring-4 focus:ring-emerald-100"
+                  placeholder="Masukkan password lama"
+                />
+              </div>
               <div>
                 <label className="text-sm font-bold text-slate-900">
                   Password Baru
@@ -521,12 +559,20 @@ export default function PengaturanPage() {
               </div>
             </div>
 
+            {passwordMsg && (
+              <div className={`mt-3 flex items-center gap-2 rounded-2xl p-3 text-sm font-medium ring-1 ${passwordMsg.type === "error" ? "bg-red-50 text-red-700 ring-red-200" : "bg-emerald-50 text-emerald-700 ring-emerald-200"}`}>
+                {passwordMsg.type === "error" ? <AlertCircle className="h-4 w-4 shrink-0" /> : <CheckCircle2 className="h-4 w-4 shrink-0" />}
+                {passwordMsg.text}
+              </div>
+            )}
+
             <div className="mt-5">
               <button
                 onClick={handlePasswordSubmit}
-                className="min-h-[54px] w-full rounded-2xl bg-[#1b8659] px-5 py-3 text-sm font-black text-[#ffff00] shadow-card transition hover:scale-[0.98]"
+                disabled={passwordLoading}
+                className="min-h-[54px] w-full rounded-2xl bg-[#1b8659] px-5 py-3 text-sm font-black text-[#ffff00] shadow-card transition hover:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
-                Simpan Password
+                {passwordLoading ? <Loader2 className="text-xl animate-spin" /> : "Simpan Password"}
               </button>
             </div>
           </div>

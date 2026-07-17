@@ -2,7 +2,6 @@
 
 import {
   BarChart3,
-  TrendingUp,
   CheckCircle2,
   ClipboardPen,
   CircleAlert,
@@ -10,42 +9,28 @@ import {
   FileDown,
   ArrowRight,
   Loader2,
-  AlertCircle,
+  Users,
 } from "lucide-react";
 import Link from "next/link";
 import { DashboardLayout } from "@/components/layout";
 import { useQuery } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
 import { queryKeys } from "@/lib/query-keys";
-
-interface DayStatus {
-  day: string;
-  date: number;
-  status: string;
-}
-
-interface WeekData {
-  week: string;
-  date: string;
-  summary: string;
-  days: DayStatus[];
-}
-
-interface DailyChartEntry {
-  day: number;
-  value: number;
-}
 
 interface AnalysisData {
   month: number;
   year: number;
-  percentage: number;
-  rating: string;
-  hadir: number;
-  izin: number;
-  alpha: number;
-  libur: number;
-  dailyChart: DailyChartEntry[];
-  weeks: WeekData[];
+  totalTeachers: number;
+  todayHadir: number;
+  todayIzin: number;
+  todaySakit: number;
+  tidakHadirHari: number;
+  dailyChart: { day: number; hadir: number }[];
+  weeks: {
+    week: string;
+    date: string;
+    days: { day: string; date: number; hadir: number; isToday: boolean }[];
+  }[];
 }
 
 const MONTH_NAMES = [
@@ -53,18 +38,14 @@ const MONTH_NAMES = [
   "Juli", "Agustus", "September", "Oktober", "November", "Desember",
 ];
 
-function getDayBg(status: string) {
-  if (status === "hadir") return "bg-[#1b8659] text-white";
-  if (status === "izin") return "bg-[#ffff00] text-[#003d7a]";
-  return "bg-slate-200 text-slate-600";
-}
-
 export default function AnalisaPage() {
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === "admin";
   const now = new Date();
   const month = now.getMonth() + 1;
   const year = now.getFullYear();
 
-  const { data, isLoading, isError } = useQuery<AnalysisData>({
+  const { data, isLoading } = useQuery<AnalysisData>({
     queryKey: queryKeys.analysis(month, year),
     queryFn: async () => {
       const res = await fetch(`/api/attendance/analysis?month=${month}&year=${year}`);
@@ -83,22 +64,18 @@ export default function AnalisaPage() {
     );
   }
 
-  if (isError || !data) {
+  if (!data) {
     return (
       <DashboardLayout>
-        <section className="w-full max-w-md mx-auto flex items-center justify-center min-h-[60vh]">
-          <div className="flex flex-col items-center gap-3 text-center">
-            <AlertCircle className="h-10 w-10 text-red-400" />
-            <p className="text-sm font-semibold text-slate-600">Gagal memuat data analisa</p>
-          </div>
-        </section>
+        <section className="w-full max-w-md mx-auto flex items-center justify-center min-h-[60vh]" />
       </DashboardLayout>
     );
   }
 
   const monthName = MONTH_NAMES[data.month - 1];
-  const barChart = data.dailyChart.map((d) => d.value);
-  const lastDay = data.dailyChart.length;
+  const barChart = data.dailyChart;
+  const lastDay = barChart.length;
+  const maxHadir = Math.max(...barChart.map((d) => d.hadir), 1);
 
   return (
     <DashboardLayout>
@@ -117,7 +94,7 @@ export default function AnalisaPage() {
                 Analisa Kehadiran
               </h1>
               <p className="mt-2 text-sm leading-relaxed text-white/80">
-                Ringkasan kehadiran guru selama bulan berjalan.
+                {isAdmin ? "Rekap kehadiran guru selama bulan berjalan." : "Ringkasan kehadiran Anda selama bulan berjalan."}
               </p>
             </div>
             <div className="relative h-16 w-16 shrink-0 rounded-3xl bg-white flex items-center justify-center shadow-card ring-4 ring-[#ffff00]/40">
@@ -129,57 +106,53 @@ export default function AnalisaPage() {
             <div className="flex items-end justify-between gap-4">
               <div>
                 <p className="text-xs font-medium text-white/70">
-                  Persentase Kehadiran
+                  Guru Hadir Hari Ini
                 </p>
                 <div className="mt-1 flex items-end gap-2">
                   <span className="font-display text-5xl font-bold leading-none tracking-tight">
-                    {data.percentage}%
+                    {data.todayHadir}
                   </span>
-                  <span className="pb-1 text-sm font-semibold text-[#ffff00]">
-                    {data.rating}
-                  </span>
+                  {isAdmin && (
+                    <span className="pb-1 text-sm font-semibold text-white/60">
+                      dari {data.totalTeachers} guru
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="h-14 w-14 rounded-2xl bg-[#ffff00] flex items-center justify-center text-[#003d7a]">
-                <TrendingUp className="text-3xl" />
+                <Users className="text-3xl" />
               </div>
-            </div>
-            <div className="mt-4 h-3 rounded-full bg-white/20 overflow-hidden">
-              <div
-                className="h-full rounded-full bg-[#ffff00]"
-                style={{ width: `${data.percentage}%` }}
-              />
             </div>
           </div>
         </div>
 
         <div className="mt-4 grid grid-cols-3 gap-3">
           <article className="rounded-[24px] bg-white p-4 text-center shadow-card ring-1 ring-slate-100">
-            <div className="mx-auto h-11 w-11 rounded-2xl bg-emerald-50 flex items-center justify-center">
-              <CheckCircle2 className="text-2xl text-[#1b8659]" />
+            <div className="mx-auto h-11 w-11 rounded-2xl bg-red-50 flex items-center justify-center">
+              <CircleAlert className="text-2xl text-red-400" />
             </div>
-            <p className="mt-3 font-display text-3xl font-bold tracking-tight text-[#1b8659]">
-              {data.hadir}
+            <p className="mt-3 font-display text-3xl font-bold tracking-tight text-red-400">
+              {data.todaySakit}
             </p>
-            <p className="text-xs font-semibold text-slate-500">Hadir</p>
+            <p className="text-xs font-semibold text-slate-500">Sakit Hari Ini</p>
           </article>
           <article className="rounded-[24px] bg-white p-4 text-center shadow-card ring-1 ring-slate-100">
             <div className="mx-auto h-11 w-11 rounded-2xl bg-yellow-50 flex items-center justify-center">
               <ClipboardPen className="text-2xl text-amber-500" />
             </div>
             <p className="mt-3 font-display text-3xl font-bold tracking-tight text-amber-500">
-              {data.izin}
+              {data.todayIzin}
             </p>
-            <p className="text-xs font-semibold text-slate-500">Izin</p>
+            <p className="text-xs font-semibold text-slate-500">Izin Hari Ini</p>
           </article>
           <article className="rounded-[24px] bg-white p-4 text-center shadow-card ring-1 ring-slate-100">
-            <div className="mx-auto h-11 w-11 rounded-2xl bg-blue-50 flex items-center justify-center">
-              <CircleAlert className="text-2xl text-[#003d7a]" />
+            <div className="mx-auto h-11 w-11 rounded-2xl bg-red-50 flex items-center justify-center">
+              <CircleAlert className="text-2xl text-red-400" />
             </div>
-            <p className="mt-3 font-display text-3xl font-bold tracking-tight text-[#003d7a]">
-              {data.alpha}
+            <p className="mt-3 font-display text-3xl font-bold tracking-tight text-red-400">
+              {data.tidakHadirHari}
             </p>
-            <p className="text-xs font-semibold text-slate-500">Alpha</p>
+            <p className="text-xs font-semibold text-slate-500">Tidak Hadir</p>
           </article>
         </div>
 
@@ -190,7 +163,7 @@ export default function AnalisaPage() {
                 Grafik Harian
               </h2>
               <p className="mt-1 text-sm text-slate-500">
-                Status kehadiran 1–{lastDay} {monthName} {data.year}
+                Jumlah guru hadir per hari
               </p>
             </div>
           </div>
@@ -211,9 +184,10 @@ export default function AnalisaPage() {
                 const w = 310;
                 const h = 120;
                 const padding = 4;
-                const points = barChart.map((val, i) => {
-                  const x = padding + (i / (barChart.length - 1)) * (w - padding * 2);
-                  const y = h - padding - (val / 100) * (h - padding * 2);
+                const vals = barChart.map((d) => d.hadir);
+                const points = vals.map((val, i) => {
+                  const x = padding + (i / (vals.length - 1)) * (w - padding * 2);
+                  const y = h - padding - (val / maxHadir) * (h - padding * 2);
                   return { x, y };
                 });
                 const lineD = points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
@@ -242,19 +216,7 @@ export default function AnalisaPage() {
           <div className="mt-4 flex flex-wrap gap-3">
             <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
               <span className="h-3 w-3 rounded-full bg-[#1b8659]" />
-              Hadir
-            </div>
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
-              <span className="h-3 w-3 rounded-full bg-[#ffff00] ring-1 ring-amber-200" />
-              Izin
-            </div>
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
-              <span className="h-3 w-3 rounded-full bg-[#003d7a]" />
-              Alpha
-            </div>
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
-              <span className="h-3 w-3 rounded-full bg-slate-300" />
-              Libur
+              Jumlah Hadir
             </div>
           </div>
         </section>
@@ -266,7 +228,7 @@ export default function AnalisaPage() {
                 Rincian Mingguan
               </h2>
               <p className="mt-1 text-sm text-slate-500">
-                Performa kehadiran setiap pekan
+                Total guru hadir setiap hari
               </p>
             </div>
             <CalendarRange className="text-2xl text-[#1b8659]" />
@@ -283,20 +245,30 @@ export default function AnalisaPage() {
                     <h3 className="font-bold text-slate-950">{week.week}</h3>
                     <p className="text-xs text-slate-500">{week.date}</p>
                   </div>
-                  <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-[#1b8659]">
-                    {week.summary}
-                  </span>
                 </div>
-                <div className="mt-3 grid grid-cols-5 gap-2 text-center">
-                  {week.days.map((day) => (
-                    <div
-                      key={day.day}
-                      className={`rounded-2xl px-2 py-2 ${getDayBg(day.status)}`}
-                    >
-                      <p className="text-[11px] font-bold">{day.day}</p>
-                      <p className="text-[10px] capitalize">{day.status}</p>
-                    </div>
-                  ))}
+                <div className="mt-3 grid grid-cols-6 gap-2 text-center">
+                  {week.days.map((day) => {
+                    const isToday = day.isToday;
+                    const isFuture = day.date > now.getDate();
+                    return (
+                      <div
+                        key={day.date}
+                        className={`rounded-2xl px-1 py-2 ${
+                          isToday
+                            ? "bg-[#ffff00] ring-2 ring-[#1b8659] text-[#003d7a]"
+                            : day.hadir > 0
+                            ? "bg-[#1b8659] text-white"
+                            : "bg-slate-200 text-slate-500"
+                        }`}
+                      >
+                        <p className="text-[11px] font-bold">{day.day}</p>
+                        <p className="text-[10px]">{day.date}</p>
+                        <p className="mt-0.5 text-[10px] font-bold">
+                          {day.hadir > 0 ? `${day.hadir} hadir` : isFuture ? "-" : "0"}
+                        </p>
+                      </div>
+                    );
+                  })}
                 </div>
               </article>
             ))}

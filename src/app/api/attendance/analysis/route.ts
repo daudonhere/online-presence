@@ -3,6 +3,10 @@ import { auth } from "@/lib/auth";
 import { getSupabase } from "@/lib/supabase";
 import { apiError, apiSuccess, withErrorHandling } from "@/lib/api-response";
 
+function localDate(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export const GET = withErrorHandling(async (req: NextRequest) => {
   const session = await auth();
   if (!session?.user?.id) return apiError("Unauthorized", 401);
@@ -11,11 +15,107 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
   const now = new Date();
   const month = parseInt(searchParams.get("month") || String(now.getMonth() + 1));
   const year = parseInt(searchParams.get("year") || String(now.getFullYear()));
+  const isAdmin = session.user.role === "admin";
+
+  const startDate = localDate(new Date(year, month - 1, 1));
+  const endDate = localDate(new Date(year, month, 0));
+  const totalDays = new Date(year, month, 0).getDate();
+  const today = localDate(now);
+
+  if (isAdmin) {
+    const { data: teachers } = await getSupabase()
+      .from("User")
+      .select("id")
+      .eq("role", "teacher");
+
+    const totalTeachers = teachers?.length || 0;
+
+    const { data: allAttendance } = await getSupabase()
+      .from("Attendance")
+      .select("date, status")
+      .gte("date", startDate)
+      .lte("date", endDate);
+
+    const { data: todayObstacles } = await getSupabase()
+      .from("Obstacle")
+      .select("category")
+      .eq("date", today)
+      .eq("status", "approved");
+
+    const todayIzinCount = todayObstacles?.filter(
+      (o) => o.category === "izin" || o.category === "cuti"
+    ).length || 0;
+
+    const todaySakitCount = todayObstacles?.filter(
+      (o) => o.category === "sakit"
+    ).length || 0;
+
+    const dailyChart: { day: number; hadir: number }[] = [];
+    for (let d = 1; d <= totalDays; d++) {
+      const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      const hadirCount = (allAttendance || []).filter(
+        (r) => r.date === dateStr && r.status === "hadir"
+      ).length;
+      dailyChart.push({ day: d, hadir: hadirCount });
+    }
+
+    const todayHadir = dailyChart.find((d) => d.day === now.getDate())?.hadir ?? 0;
+    const tidakHadirHari = Math.max(0, totalTeachers - todayHadir - todayIzinCount - todaySakitCount);
+
+    const weeks: {
+      week: string;
+      date: string;
+      days: { day: string; date: number; hadir: number; isToday: boolean }[];
+    }[] = [];
+
+    const dayNames = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
+    let weekNum = 1;
+    let currentWeekDays: { day: string; date: number; hadir: number; isToday: boolean }[] = [];
+
+    for (let d = 1; d <= totalDays; d++) {
+      const dateObj = new Date(year, month - 1, d);
+      const dayOfWeek = dateObj.getDay();
+      if (dayOfWeek === 0) continue;
+
+      const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      const hadirCount = (allAttendance || []).filter(
+        (r) => r.date === dateStr && r.status === "hadir"
+      ).length;
+
+      currentWeekDays.push({
+        day: dayNames[currentWeekDays.length] || `D${d}`,
+        date: d,
+        hadir: hadirCount,
+        isToday: dateStr === today,
+      });
+
+      if (dayOfWeek === 6 || d === totalDays) {
+        const firstDay = currentWeekDays[0].date;
+        const lastDay = currentWeekDays[currentWeekDays.length - 1].date;
+        weeks.push({
+          week: `Minggu ${weekNum}`,
+          date: `${firstDay}–${lastDay} ${new Date(year, month - 1).toLocaleString("id-ID", { month: "long" })}`,
+          days: currentWeekDays,
+        });
+        currentWeekDays = [];
+        weekNum++;
+      }
+    }
+
+    return apiSuccess({
+      month,
+      year,
+      totalTeachers,
+      todayHadir,
+      todayIzin: todayIzinCount,
+      todaySakit: todaySakitCount,
+      tidakHadirHari,
+      dailyChart,
+      weeks,
+    });
+  }
 
   const userId = Number(session.user.id);
-  const startDate = new Date(year, month - 1, 1).toISOString().split("T")[0];
-  const endDate = new Date(year, month, 0).toISOString().split("T")[0];
-
   const { data: records } = await getSupabase()
     .from("Attendance")
     .select("*")
@@ -25,88 +125,66 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     .order("date", { ascending: true });
 
   const allRecords = records || [];
-  const totalDays = new Date(year, month, 0).getDate();
   const hadir = allRecords.filter((r) => r.status === "hadir").length;
   const izin = allRecords.filter((r) => r.status === "izin").length;
   const alpha = allRecords.filter((r) => r.status === "alpha").length;
   const libur = allRecords.filter((r) => r.status === "libur").length;
 
-  const workDays = totalDays - libur || hadir + izin + alpha;
-  const percentage = workDays > 0 ? Math.round((hadir / workDays) * 100) : 0;
-
-  let rating = "Belum Ada Data";
-  if (percentage >= 90) rating = "Sangat Baik";
-  else if (percentage >= 75) rating = "Baik";
-  else if (percentage >= 60) rating = "Cukup";
-  else if (percentage > 0) rating = "Kurang";
-
-  const dailyChart: { day: number; value: number }[] = [];
+  const dailyChart: { day: number; hadir: number }[] = [];
   for (let d = 1; d <= totalDays; d++) {
-    const dateObj = new Date(year, month - 1, d);
     const rec = allRecords.find((r) => new Date(r.date).getDate() === d);
-    let value = 25;
-    if (rec) {
-      if (rec.status === "hadir") value = 90 + Math.random() * 10;
-      else if (rec.status === "izin") value = 55 + Math.random() * 10;
-      else if (rec.status === "alpha") value = 20 + Math.random() * 10;
-    } else if (dateObj.getDay() === 0 || dateObj.getDay() === 6) {
-      value = 25;
-    }
-    dailyChart.push({ day: d, value: Math.round(value) });
+    dailyChart.push({
+      day: d,
+      hadir: rec && rec.status === "hadir" ? 1 : 0,
+    });
   }
 
-  const dayNames = ["Sen", "Sel", "Rab", "Kam", "Jum"];
+  const dayNames = ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
   const weeks: {
     week: string;
     date: string;
-    summary: string;
-    days: { day: string; date: number; status: string }[];
+    days: { day: string; date: number; hadir: number; isToday: boolean }[];
   }[] = [];
 
   let weekNum = 1;
-  for (let startDay = 1; startDay <= totalDays; startDay += 5) {
-    const endDay = Math.min(startDay + 4, totalDays);
-    const weekRecords = allRecords.filter((r) => {
-      const d = new Date(r.date).getDate();
-      return d >= startDay && d <= endDay;
+  let currentWeekDays: { day: string; date: number; hadir: number; isToday: boolean }[] = [];
+
+  for (let d = 1; d <= totalDays; d++) {
+    const dateObj = new Date(year, month - 1, d);
+    const dayOfWeek = dateObj.getDay();
+    if (dayOfWeek === 0) continue;
+
+    const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    const rec = allRecords.find((r) => new Date(r.date).getDate() === d);
+
+    currentWeekDays.push({
+      day: dayNames[currentWeekDays.length] || `D${d}`,
+      date: d,
+      hadir: rec && rec.status === "hadir" ? 1 : 0,
+      isToday: dateStr === today,
     });
 
-    const days = [];
-    for (let d = startDay; d <= endDay; d++) {
-      const dateObj = new Date(year, month - 1, d);
-      if (dateObj.getDay() === 0 || dateObj.getDay() === 6) continue;
-      const rec = weekRecords.find((r) => new Date(r.date).getDate() === d);
-      days.push({
-        day: dayNames[days.length] || `D${d}`,
-        date: d,
-        status: rec ? rec.status : "libur",
+    if (dayOfWeek === 6 || d === totalDays) {
+      const firstDay = currentWeekDays[0].date;
+      const lastDay = currentWeekDays[currentWeekDays.length - 1].date;
+      weeks.push({
+        week: `Minggu ${weekNum}`,
+        date: `${firstDay}–${lastDay} ${new Date(year, month - 1).toLocaleString("id-ID", { month: "long" })}`,
+        days: currentWeekDays,
       });
+      currentWeekDays = [];
+      weekNum++;
     }
-
-    const h = weekRecords.filter((r) => r.status === "hadir").length;
-    const i = weekRecords.filter((r) => r.status === "izin").length;
-    const summaryParts: string[] = [];
-    if (h > 0) summaryParts.push(`${h} Hadir`);
-    if (i > 0) summaryParts.push(`${i} Izin`);
-
-    weeks.push({
-      week: `Minggu ${weekNum}`,
-      date: `${startDay}–${endDay} ${new Date(year, month - 1).toLocaleString("id-ID", { month: "long" })}`,
-      summary: summaryParts.join(" · ") || "Belum ada data",
-      days,
-    });
-    weekNum++;
   }
 
   return apiSuccess({
     month,
     year,
-    percentage,
-    rating,
-    hadir,
-    izin,
-    alpha,
-    libur,
+    totalTeachers: 1,
+    todayHadir: allRecords.find((r) => new Date(r.date).getDate() === now.getDate() && r.status === "hadir") ? 1 : 0,
+    todayIzin: izin,
+    todaySakit: 0,
+    tidakHadirHari: alpha,
     dailyChart,
     weeks,
   });
