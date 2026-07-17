@@ -33,6 +33,17 @@ export default function RootLayout({
     <html lang="id">
       <head>
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator && 'PushManager' in window) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw-push.js').catch(function() {});
+                });
+              }
+            `,
+          }}
+        />
       </head>
       <body className="min-h-full flex flex-col">
         <Providers>{children}</Providers>

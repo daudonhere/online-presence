@@ -4,6 +4,7 @@ import { getSupabase } from "@/lib/supabase";
 import { saveFile, UploadError } from "@/lib/upload";
 import { apiError, apiSuccess, withErrorHandling } from "@/lib/api-response";
 import { obstacleSchema } from "@/lib/validations";
+import { sendPushToAllAdmins } from "@/lib/push";
 
 export const GET = withErrorHandling(async () => {
   const session = await auth();
@@ -60,5 +61,44 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
     .single();
 
   if (error) throw error;
+
+  const categoryLabel: Record<string, string> = {
+    sakit: "Sakit",
+    izin: "Izin",
+    cuti: "Cuti",
+  };
+
+  const { data: user } = await getSupabase()
+    .from("User")
+    .select("name")
+    .eq("id", Number(session.user.id))
+    .single();
+
+  const teacherName = user?.name || "Guru";
+  const catLabel = categoryLabel[category] || category;
+
+  sendPushToAllAdmins({
+    title: "Pengajuan Baru",
+    body: `${teacherName} mengajukan ${catLabel} untuk tanggal ${date}`,
+    url: "/halangan/admin/persetujuan",
+    tag: `obstacle-${record.id}`,
+  }).catch(() => {});
+
+  const inAppNotif = await getSupabase()
+    .from("User")
+    .select("id")
+    .eq("role", "admin");
+
+  if (inAppNotif.data) {
+    const notifInserts = inAppNotif.data.map((admin) => ({
+      userId: admin.id,
+      title: "Pengajuan Baru",
+      message: `${teacherName} mengajukan ${catLabel} untuk tanggal ${date}`,
+      type: "obstacle",
+      isRead: false,
+    }));
+    await getSupabase().from("Notification").insert(notifInserts);
+  }
+
   return apiSuccess(record, 201);
 });

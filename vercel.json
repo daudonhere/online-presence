@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/reminder-masuk",
+      "schedule": "0 23 * * 0-4 UTC"
+    },
+    {
+      "path": "/api/cron/monthly-summary",
+      "schedule": "0 1 1 * * UTC"
+    }
+  ]
+}

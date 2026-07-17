@@ -4,12 +4,12 @@
 
 | Phase | Status | Description |
 |-------|--------|-------------|
-| 0 | Done | Foundation (seed ✓, error handling, security) |
+| 0 | Done | Foundation (seed, error handling, security) |
 | 1 | Done | Database setup (Supabase PostgreSQL + Storage) |
-| 2 | Done | Auth (register/login/logout, middleware, session) |
+| 2 | Done | Auth (register/login/logout/change-password, middleware, session) |
 | 3 | Done | Core features (profile, attendance, obstacle, notifications) |
 | 4 | Done | Analytics & reports |
-| 5 | Pending | Admin dashboard (future) |
+| 5 | Partial | Admin halangan (persetujuan + riwayat) + admin analisa |
 | 6 | Done | Polish (Zod, lint, React Query, PWA offline page) |
 | 7 | Pending | Testing |
 | 8 | Pending | Deployment (Vercel + Supabase) |
@@ -24,7 +24,7 @@ Minimum Viable Product = guru bisa login, absen (QR/manual), submit halangan, li
 - [x] QR scan attendance (live camera via html5-qrcode)
 - [x] Obstacle submission (sakit/izin/cuti)
 - [x] Profile view & edit
-- [x] Notification preferences toggle
+- [x] Notification preferences toggle (reminderMasuk + monthlySummary, UI shows 2 toggles)
 - [x] Middleware route protection
 
 **Tidak di MVP:** Admin dashboard, report generation, analytics real-time, notification push.
@@ -133,13 +133,25 @@ Minimum Viable Product = guru bisa login, absen (QR/manual), submit halangan, li
 
 ## Phase 5: Admin Features
 
-### 5.1 Admin Dashboard (future)
+### 5.1 Admin Halangan
+- [x] Admin hub page (`/halangan`) — shows 2 cards: Persetujuan + Riwayat (teacher sees 3 category cards)
+- [x] Admin Persetujuan page (`/halangan/admin/persetujuan`) — period filter (month/year pills), search by name/phone, approve/reject buttons, file download via fetch+blob
+- [x] Admin Riwayat page (`/halangan/admin/riwayat`) — period filter, search, history items with status badges, checkbox multi-select, bulk delete, single delete icon, file download
+- [x] `GET /api/admin/obstacles?category=&month=&year=` — list all obstacles with filters
+- [x] `PATCH /api/admin/obstacles/:id` — approve/reject (creates Attendance on approve), `await ctx.params`
+- [x] `DELETE /api/admin/obstacles/:id` — delete single + Supabase storage cleanup
+- [x] `DELETE /api/admin/obstacles` — bulk delete (`{ ids: number[] }`) or delete all (`{ all: true }`)
+
+### 5.2 Admin Analisa
+- [x] Admin analisa view — big stat "Guru Hadir Hari Ini", 3 cards (Sakit Hari Ini, Izin Hari Ini, Tidak Hadir), SVG line chart (daily hadir), weekly breakdown Mon-Sat
+- [x] Analysis API admin branch — `todayHadir`, `todayIzin`, `todaySakit`, `tidakHadirHari`, `dailyChart`, `weeks`; uses `localDate()` for WIB timezone
+
+### 5.3 Admin Dashboard (future)
 - [ ] `GET /api/admin/teachers` — list all teachers
 - [ ] `GET /api/admin/teachers/:id` — get teacher detail
 - [ ] `PUT /api/admin/teachers/:id` — update teacher
 - [ ] `DELETE /api/admin/teachers/:id` — delete teacher
-- [ ] `PATCH /api/obstacles/:id` — approve/reject obstacle (updates Attendance status)
-- [ ] Create admin pages (teacher management, obstacle review, report generation)
+- [ ] Create admin pages (teacher management)
 
 ## Phase 6: Polish
 
@@ -169,6 +181,16 @@ Minimum Viable Product = guru bisa login, absen (QR/manual), submit halangan, li
 - [ ] Test service worker in production build
 - [ ] Test install prompt flow
 - [x] Add offline fallback page (`src/app/offline/page.tsx`)
+
+### 6.5 Additional Features
+- [x] QR code click-to-download as PNG (`QrUserId.tsx` — SVG→canvas→PNG, named `QR-{name}.png`)
+- [x] Change password API (`POST /api/auth/change-password`) — verify current password, hash new with bcryptjs
+- [x] Password modal: current password field + new password + retype, loading state, success/error feedback
+- [x] Admin halangan hub: admin sees Persetujuan + Riwayat cards, teacher sees 3 category cards
+- [x] Admin analisa: admin gets all-teacher stats, teacher gets personal stats; uses `localDate()` for WIB
+- [x] Notification bell component (`NotificationBell.tsx`) + notification API routes
+- [x] Custom DatePicker component (`DatePicker.tsx`) — DD/MM/YYYY, no past dates
+- [x] React Query configured via `Providers` component + query keys in `query-keys.ts`
 
 ## Phase 7: Testing
 
@@ -312,6 +334,7 @@ createdAt DateTime  @default(now())
 | `/api/auth/register` | POST | No | registerSchema | Register |
 | `/api/auth/login` | POST | No | — | Login (via Auth.js) |
 | `/api/auth/logout` | POST | Yes | — | Logout |
+| `/api/auth/change-password` | POST | Yes | — | Change password (verify current + hash new) |
 | `/api/profile` | GET | Yes | — | Get profile |
 | `/api/profile` | PUT | Yes | profileUpdateSchema | Update profile |
 | `/api/profile/avatar` | POST | Yes | — | Upload avatar |
@@ -319,15 +342,21 @@ createdAt DateTime  @default(now())
 | `/api/attendance` | POST | Yes | attendanceSchema | Manual check-in |
 | `/api/attendance/check-out` | POST | Yes | checkOutSchema | Check-out |
 | `/api/attendance/last` | GET | Yes | — | Last status |
-| `/api/attendance/analysis` | GET | Yes | — | Monthly analysis |
+| `/api/attendance/analysis` | GET | Yes | — | Monthly analysis (admin: all teachers) |
 | `/api/scan` | POST | Yes | scanSchema | QR scan check-in |
 | `/api/obstacles` | GET | Yes | — | List obstacles |
 | `/api/obstacles` | POST | Yes | obstacleSchema | Submit obstacle |
-| `/api/obstacles/:id` | PATCH | Admin | — | Approve/reject |
+| `/api/notifications` | GET | Yes | — | List notifications |
+| `/api/notifications/:id` | PATCH | Yes | — | Mark as read |
+| `/api/notifications/:id` | DELETE | Yes | — | Delete notification |
 | `/api/notifications/preferences` | GET | Yes | — | Get preferences |
 | `/api/notifications/preferences` | PUT | Yes | notificationPrefsSchema | Update preferences |
+| `/api/admin/obstacles` | GET | Admin | — | List all obstacles (category/month/year filters) |
+| `/api/admin/obstacles/:id` | PATCH | Admin | — | Approve/reject obstacle |
+| `/api/admin/obstacles/:id` | DELETE | Admin | — | Delete obstacle + storage file |
+| `/api/admin/obstacles` | DELETE | Admin | — | Bulk delete / delete all obstacles |
 | `/api/reports` | GET | Yes | — | List reports |
 | `/api/reports/generate` | POST | Admin | — | Generate report |
-| `/api/reports/:id/download` | GET | Yes | — | Download report |
-| `/api/admin/teachers` | GET | Admin | — | List teachers |
-| `/api/admin/teachers/:id` | GET/PUT/DELETE | Admin | — | Manage teacher |
+| `/api/reports/:id` | GET | Yes | — | Download report |
+| `/api/admin/teachers` | GET | Admin | — | List teachers (planned) |
+| `/api/admin/teachers/:id` | GET/PUT/DELETE | Admin | — | Manage teacher (planned) |

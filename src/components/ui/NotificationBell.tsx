@@ -11,9 +11,11 @@ import {
   FileClock,
   Info,
   X,
+  BellRing,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/query-keys";
+import { usePushSubscription } from "@/lib/hooks";
 
 interface Notification {
   id: number;
@@ -63,6 +65,7 @@ export function NotificationBell() {
   const panelRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const queryClient = useQueryClient();
+  const { isSupported, isSubscribed, loading: pushLoading, subscribing, subscribe } = usePushSubscription();
 
   const { data, isLoading } = useQuery<NotificationsResponse>({
     queryKey: queryKeys.notifications.list,
@@ -159,6 +162,20 @@ export function NotificationBell() {
               Notifikasi
             </h3>
             <div className="flex items-center gap-2">
+              {isSupported && !isSubscribed && (
+                <button
+                  onClick={subscribe}
+                  disabled={subscribing || pushLoading}
+                  className="flex items-center gap-1.5 rounded-xl bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50"
+                >
+                  {subscribing ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <BellRing className="h-3 w-3" />
+                  )}
+                  Aktifkan Push
+                </button>
+              )}
               {hasUnread && (
                 <button
                   onClick={() => markAllReadMutation.mutate()}

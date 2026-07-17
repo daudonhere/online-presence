@@ -15,10 +15,10 @@ This applies to ALL agents and subagents, at ALL times. No exceptions. Only run 
 Fullstack Next.js 16 (App Router) with:
 
 - **Frontend:** Next.js 16, Tailwind CSS v4, Zustand, React Query
-- **Backend:** Next.js API Routes / Server Actions, Prisma (SQLite), Auth.js v5
+- **Backend:** Next.js API Routes / Server Actions, Supabase (PostgreSQL), Auth.js v5
 - **PWA:** next-pwa
 - **Validation:** Zod v4
-- **Database:** SQLite via Prisma 7 (BetterSqlite3 driver adapter)
+- **Database:** PostgreSQL via Supabase (`@supabase/supabase-js`)
 
 ## Commands
 
@@ -27,9 +27,6 @@ npm run dev                # Start dev server (ONLY when user asks)
 npm run build              # Build for production (ONLY when user asks)
 npm run lint               # Run ESLint (ONLY when user asks)
 npm run start              # Start production server
-npx prisma migrate dev     # Run migrations (ONLY when user asks)
-npx prisma generate        # Generate Prisma client
-npx prisma studio          # Open Prisma Studio
 ```
 
 ## Routes
@@ -41,9 +38,12 @@ npx prisma studio          # Open Prisma Studio
 | `/manual` | `src/app/manual/page.tsx` | Absen manual |
 | `/analisa` | `src/app/analisa/page.tsx` | Analisa data kehadiran |
 | `/laporan` | `src/app/laporan/page.tsx` | Laporan kehadiran |
-| `/halangan` | `src/app/halangan/page.tsx` | Halangan / kategori kendala |
+| `/halangan` | `src/app/halangan/page.tsx` | Halangan hub (admin: Persetujuan + Riwayat, teacher: 3 kategori) |
 | `/halangan/[category]` | `src/app/halangan/[category]/page.tsx` | Form submit halangan |
+| `/halangan/admin/persetujuan` | `src/app/halangan/admin/persetujuan/page.tsx` | Admin: approve/reject halangan |
+| `/halangan/admin/riwayat` | `src/app/halangan/admin/riwayat/page.tsx` | Admin: riwayat halangan + delete |
 | `/pengaturan` | `src/app/pengaturan/page.tsx` | Pengaturan aplikasi |
+| `/offline` | `src/app/offline/page.tsx` | Offline fallback page |
 | `/auth` | `src/app/auth/page.tsx` | Login / Register (outside DashboardLayout) |
 
 ## Features
@@ -115,10 +115,9 @@ npx prisma studio          # Open Prisma Studio
 ### Settings (`/pengaturan`)
 - **Profile Header:** clickable profile image upload (max 1 MB), default avatar, badge "Profil Guru", name/subject/NIP display
 - **Data Dasar (editable inline):** Nama, Guru Bidang Pelajaran, NIP, Email, Nomor Telepon
-- **Login & Password:** "Ubah Password" button → modal with Password Baru + Ketik Ulang (min 6 chars, match check)
+- **Login & Password:** "Ubah Password" button → modal with Password Lama + Password Baru + Ketik Ulang (min 6 chars, match check), calls `POST /api/auth/change-password`
 - **Notifikasi (toggles):**
   - Pengingat Absen Masuk — default ON, "Dikirim sebelum jam 07.00 WIB"
-  - Pengingat Absen Pulang — default ON, "Dikirim setelah jam mengajar selesai"
   - Ringkasan Bulanan — default OFF, "Laporan singkat setiap akhir bulan"
 - **Logout:** red section "Keluar dari Akun" (Auth.js signOut)
 - **Footer:** "Absensi Guru MTS AL-RIYADL v1.0.0"
@@ -476,3 +475,4 @@ online-presence/
 - Auth config in `src/lib/auth.ts`
 - All API routes use Zod validation where user input is accepted
 - All pages fetch from real API routes
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    

@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
 import { getSupabase } from "@/lib/supabase";
 import { apiError, apiSuccess, withErrorHandling } from "@/lib/api-response";
+import { sendPushToUser } from "@/lib/push";
 
 export const PATCH = withErrorHandling(
   async (req: NextRequest, ctx?: unknown) => {
@@ -38,6 +39,29 @@ export const PATCH = withErrorHandling(
       .eq("id", obstacleId);
 
     if (updateError) throw updateError;
+
+    const categoryLabel: Record<string, string> = {
+      sakit: "Sakit",
+      izin: "Izin",
+      cuti: "Cuti",
+    };
+    const catLabel = categoryLabel[obstacle.category] || obstacle.category;
+    const statusText = action === "approved" ? "Disetujui" : "Ditolak";
+
+    sendPushToUser(obstacle.userId, {
+      title: `Pengajuan ${statusText}`,
+      body: `Pengajuan ${catLabel} Anda telah ${statusText.toLowerCase()} oleh admin`,
+      url: "/halangan",
+      tag: `obstacle-${obstacleId}`,
+    }).catch(() => {});
+
+    await getSupabase().from("Notification").insert({
+      userId: obstacle.userId,
+      title: `Pengajuan ${statusText}`,
+      message: `Pengajuan ${catLabel} Anda telah ${statusText.toLowerCase()} oleh admin`,
+      type: "obstacle",
+      isRead: false,
+    });
 
     if (action === "approved") {
       let attendanceStatus = "izin";
