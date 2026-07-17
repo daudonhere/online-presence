@@ -9,7 +9,7 @@ export const PATCH = withErrorHandling(
     if (!session?.user?.id) return apiError("Unauthorized", 401);
     if (session.user.role !== "admin") return apiError("Forbidden", 403);
 
-    const { id } = (ctx as { params: { id: string } }).params;
+    const { id } = await (ctx as { params: Promise<{ id: string }> }).params;
     const obstacleId = Number(id);
     if (isNaN(obstacleId)) return apiError("ID tidak valid", 400);
 
@@ -68,5 +68,41 @@ export const PATCH = withErrorHandling(
     }
 
     return apiSuccess({ success: true, status: action });
+  }
+);
+
+export const DELETE = withErrorHandling(
+  async (_req: NextRequest, ctx?: unknown) => {
+    const session = await auth();
+    if (!session?.user?.id) return apiError("Unauthorized", 401);
+    if (session.user.role !== "admin") return apiError("Forbidden", 403);
+
+    const { id } = await (ctx as { params: Promise<{ id: string }> }).params;
+    const obstacleId = Number(id);
+    if (isNaN(obstacleId)) return apiError("ID tidak valid", 400);
+
+    const { data: obstacle, error: fetchError } = await getSupabase()
+      .from("Obstacle")
+      .select("id, fileUrl")
+      .eq("id", obstacleId)
+      .single();
+
+    if (fetchError || !obstacle) return apiError("Pengajuan tidak ditemukan", 404);
+
+    if (obstacle.fileUrl) {
+      const path = obstacle.fileUrl.split("/obstacles/")[1];
+      if (path) {
+        await getSupabase().storage.from("obstacles").remove([path]);
+      }
+    }
+
+    const { error } = await getSupabase()
+      .from("Obstacle")
+      .delete()
+      .eq("id", obstacleId);
+
+    if (error) throw error;
+
+    return apiSuccess({ success: true });
   }
 );
