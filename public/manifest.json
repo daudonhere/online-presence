@@ -3,9 +3,13 @@
   "short_name": "AbsensiAlRiyadl",
   "description": "Aplikasi Absensi Guru MTS AL-RIYADL",
   "start_url": "/",
+  "id": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "browser"],
   "background_color": "#f8fafc",
   "theme_color": "#1b8659",
+  "orientation": "portrait-primary",
+  "categories": ["education", "productivity"],
   "icons": [
     {
       "src": "/icons/icon-192x192.png",
