@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getSupabase } from "@/lib/supabase";
 import { apiError, apiSuccess, withErrorHandling } from "@/lib/api-response";
 
 export const GET = withErrorHandling(async (req: NextRequest) => {
@@ -13,22 +13,23 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
   const year = parseInt(searchParams.get("year") || String(now.getFullYear()));
 
   const userId = Number(session.user.id);
-  const startDate = new Date(year, month - 1, 1);
-  const endDate = new Date(year, month, 0);
+  const startDate = new Date(year, month - 1, 1).toISOString().split("T")[0];
+  const endDate = new Date(year, month, 0).toISOString().split("T")[0];
 
-  const records = await prisma.attendance.findMany({
-    where: {
-      userId,
-      date: { gte: startDate, lte: endDate },
-    },
-    orderBy: { date: "asc" },
-  });
+  const { data: records } = await getSupabase()
+    .from("Attendance")
+    .select("*")
+    .eq("userId", userId)
+    .gte("date", startDate)
+    .lte("date", endDate)
+    .order("date", { ascending: true });
 
-  const totalDays = endDate.getDate();
-  const hadir = records.filter((r) => r.status === "hadir").length;
-  const izin = records.filter((r) => r.status === "izin").length;
-  const alpha = records.filter((r) => r.status === "alpha").length;
-  const libur = records.filter((r) => r.status === "libur").length;
+  const allRecords = records || [];
+  const totalDays = new Date(year, month, 0).getDate();
+  const hadir = allRecords.filter((r) => r.status === "hadir").length;
+  const izin = allRecords.filter((r) => r.status === "izin").length;
+  const alpha = allRecords.filter((r) => r.status === "alpha").length;
+  const libur = allRecords.filter((r) => r.status === "libur").length;
 
   const workDays = totalDays - libur || hadir + izin + alpha;
   const percentage = workDays > 0 ? Math.round((hadir / workDays) * 100) : 0;
@@ -42,9 +43,7 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
   const dailyChart: { day: number; value: number }[] = [];
   for (let d = 1; d <= totalDays; d++) {
     const dateObj = new Date(year, month - 1, d);
-    const rec = records.find(
-      (r) => new Date(r.date).getDate() === d
-    );
+    const rec = allRecords.find((r) => new Date(r.date).getDate() === d);
     let value = 25;
     if (rec) {
       if (rec.status === "hadir") value = 90 + Math.random() * 10;
@@ -67,7 +66,7 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
   let weekNum = 1;
   for (let startDay = 1; startDay <= totalDays; startDay += 5) {
     const endDay = Math.min(startDay + 4, totalDays);
-    const weekRecords = records.filter((r) => {
+    const weekRecords = allRecords.filter((r) => {
       const d = new Date(r.date).getDate();
       return d >= startDay && d <= endDay;
     });

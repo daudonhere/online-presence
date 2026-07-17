@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getSupabase } from "@/lib/supabase";
 import { apiError, apiSuccess, withErrorHandling } from "@/lib/api-response";
 import { scanSchema } from "@/lib/validations";
 
@@ -16,6 +16,7 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
   }
 
   const { qrData } = result.data;
+  const supabase = getSupabase();
 
   const match = qrData.match(/^ATTENDANCE:USER:(\d+):(.+)$/);
   if (!match) return apiError("Format QR tidak valid");
@@ -27,17 +28,19 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
     return apiError("Tidak bisa scan QR sendiri");
   }
 
-  const qrUser = await prisma.user.findUnique({
-    where: { id: qrUserId },
-    select: { id: true, role: true, name: true },
-  });
+  const { data: qrUser } = await supabase
+    .from("User")
+    .select("id, role, name")
+    .eq("id", qrUserId)
+    .single();
 
   if (!qrUser) return apiError("User pada QR tidak ditemukan");
 
-  const currentUser = await prisma.user.findUnique({
-    where: { id: currentUserId },
-    select: { role: true },
-  });
+  const { data: currentUser } = await supabase
+    .from("User")
+    .select("role")
+    .eq("id", currentUserId)
+    .single();
 
   let attendanceUserId: number;
 
@@ -49,12 +52,14 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
     return apiError("Scan tidak valid. Guru harus scan QR admin, atau admin harus scan QR guru.");
   }
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const todayStr = new Date().toISOString().split("T")[0];
 
-  const existing = await prisma.attendance.findUnique({
-    where: { userId_date: { userId: attendanceUserId, date: today } },
-  });
+  const { data: existing } = await supabase
+    .from("Attendance")
+    .select("id")
+    .eq("userId", attendanceUserId)
+    .eq("date", todayStr)
+    .single();
 
   if (existing) {
     return apiError("User sudah melakukan absensi hari ini");
@@ -63,15 +68,18 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
   const now = new Date();
   const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 
-  const record = await prisma.attendance.create({
-    data: {
+  const { data: record, error } = await supabase
+    .from("Attendance")
+    .insert({
       userId: attendanceUserId,
-      date: today,
+      date: todayStr,
       checkInTime: time,
       status: "hadir",
       source: "qr",
-    },
-  });
+    })
+    .select()
+    .single();
 
+  if (error) throw error;
   return apiSuccess(record, 201);
 });

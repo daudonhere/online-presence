@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getSupabase } from "@/lib/supabase";
 import { saveFile, UploadError } from "@/lib/upload";
 import { apiError, apiSuccess, withErrorHandling } from "@/lib/api-response";
 import { obstacleSchema } from "@/lib/validations";
@@ -9,12 +9,14 @@ export const GET = withErrorHandling(async () => {
   const session = await auth();
   if (!session?.user?.id) return apiError("Unauthorized", 401);
 
-  const records = await prisma.obstacle.findMany({
-    where: { userId: Number(session.user.id) },
-    orderBy: { createdAt: "desc" },
-  });
+  const { data, error } = await getSupabase()
+    .from("Obstacle")
+    .select("*")
+    .eq("userId", Number(session.user.id))
+    .order("createdAt", { ascending: false });
 
-  return apiSuccess(records);
+  if (error) throw error;
+  return apiSuccess(data);
 });
 
 export const POST = withErrorHandling(async (req: NextRequest) => {
@@ -44,16 +46,19 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
     }
   }
 
-  const record = await prisma.obstacle.create({
-    data: {
+  const { data: record, error } = await getSupabase()
+    .from("Obstacle")
+    .insert({
       userId: Number(session.user.id),
       category,
-      date: new Date(date),
+      date: new Date(date).toISOString().split("T")[0],
       reason,
       fileUrl,
       status: "pending",
-    },
-  });
+    })
+    .select()
+    .single();
 
+  if (error) throw error;
   return apiSuccess(record, 201);
 });

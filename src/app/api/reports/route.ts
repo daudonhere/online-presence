@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getSupabase } from "@/lib/supabase";
 import { apiError, apiSuccess, withErrorHandling } from "@/lib/api-response";
 
 export const GET = withErrorHandling(async (req: NextRequest) => {
@@ -14,37 +14,49 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
 
   const userId = Number(session.user.id);
   const role = (session.user as unknown as { role: string }).role;
-  const startDate = new Date(year, month - 1, 1);
-  const endDate = new Date(year, month, 0);
+  const startDate = new Date(year, month - 1, 1).toISOString().split("T")[0];
+  const endDate = new Date(year, month, 0).toISOString().split("T")[0];
+  const totalDays = new Date(year, month, 0).getDate();
 
   const monthName = new Date(year, month - 1).toLocaleString("id-ID", {
     month: "long",
     year: "numeric",
   });
 
-  const records = await prisma.attendance.findMany({
-    where: { userId, date: { gte: startDate, lte: endDate } },
-  });
+  const supabase = getSupabase();
 
-  const obstacles = await prisma.obstacle.findMany({
-    where: { userId, date: { gte: startDate, lte: endDate } },
-  });
+  const { data: records } = await supabase
+    .from("Attendance")
+    .select("*")
+    .eq("userId", userId)
+    .gte("date", startDate)
+    .lte("date", endDate);
 
-  const hadir = records.filter((r) => r.status === "hadir").length;
-  const izin = records.filter((r) => r.status === "izin").length;
-  const alpha = records.filter((r) => r.status === "alpha").length;
-  const sakit = obstacles.filter((o) => o.category === "sakit").length;
-  const izinCount = obstacles.filter((o) => o.category === "izin").length;
-  const cuti = obstacles.filter((o) => o.category === "cuti").length;
+  const { data: obstacles } = await supabase
+    .from("Obstacle")
+    .select("*")
+    .eq("userId", userId)
+    .gte("date", startDate)
+    .lte("date", endDate);
 
-  const totalDays = endDate.getDate();
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { name: true },
-  });
+  const allRecords = records || [];
+  const allObstacles = obstacles || [];
 
-  const hasAttendanceData = records.length > 0;
-  const hasObstacleData = obstacles.length > 0;
+  const hadir = allRecords.filter((r) => r.status === "hadir").length;
+  const izin = allRecords.filter((r) => r.status === "izin").length;
+  const alpha = allRecords.filter((r) => r.status === "alpha").length;
+  const sakit = allObstacles.filter((o) => o.category === "sakit").length;
+  const izinCount = allObstacles.filter((o) => o.category === "izin").length;
+  const cuti = allObstacles.filter((o) => o.category === "cuti").length;
+
+  const hasAttendanceData = allRecords.length > 0;
+  const hasObstacleData = allObstacles.length > 0;
+
+  const { data: user } = await supabase
+    .from("User")
+    .select("name")
+    .eq("id", userId)
+    .single();
 
   const reports: Array<{
     id: string;
@@ -56,14 +68,16 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
   }> = [];
 
   if (role === "admin") {
-    const allRecords = await prisma.attendance.findMany({
-      where: { date: { gte: startDate, lte: endDate } },
-    });
+    const { data: allRecordsAdmin } = await supabase
+      .from("Attendance")
+      .select("*")
+      .gte("date", startDate)
+      .lte("date", endDate);
 
-    const hasAnyData = allRecords.length > 0;
+    const hasAnyData = (allRecordsAdmin || []).length > 0;
 
     if (hasAnyData) {
-      const totalHadir = allRecords.filter((r) => r.status === "hadir").length;
+      const totalHadir = (allRecordsAdmin || []).filter((r) => r.status === "hadir").length;
       reports.push({
         id: `rekap-${month}-${year}`,
         title: `Rekap Absensi Guru ${monthName}`,

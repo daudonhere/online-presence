@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getSupabase } from "@/lib/supabase";
 import { apiError, apiSuccess, withErrorHandling } from "@/lib/api-response";
 import { notificationPrefsSchema } from "@/lib/validations";
 
@@ -8,9 +8,11 @@ export const GET = withErrorHandling(async () => {
   const session = await auth();
   if (!session?.user?.id) return apiError("Unauthorized", 401);
 
-  const prefs = await prisma.notificationPreference.findUnique({
-    where: { userId: Number(session.user.id) },
-  });
+  const { data: prefs } = await getSupabase()
+    .from("NotificationPreference")
+    .select("*")
+    .eq("userId", Number(session.user.id))
+    .single();
 
   return apiSuccess({
     reminderMasuk: prefs?.reminderMasuk ?? true,
@@ -31,25 +33,34 @@ export const PUT = withErrorHandling(async (req: NextRequest) => {
   }
 
   const { reminderMasuk, reminderPulang, monthlySummary } = result.data;
+  const userId = Number(session.user.id);
+  const supabase = getSupabase();
 
-  const prefs = await prisma.notificationPreference.upsert({
-    where: { userId: Number(session.user.id) },
-    update: {
-      ...(typeof reminderMasuk === "boolean" && { reminderMasuk }),
-      ...(typeof reminderPulang === "boolean" && { reminderPulang }),
-      ...(typeof monthlySummary === "boolean" && { monthlySummary }),
-    },
-    create: {
-      userId: Number(session.user.id),
+  const { data: existing } = await supabase
+    .from("NotificationPreference")
+    .select("userId, reminderMasuk, reminderPulang, monthlySummary")
+    .eq("userId", userId)
+    .single();
+
+  const updateData: Record<string, unknown> = {};
+  if (typeof reminderMasuk === "boolean") updateData.reminderMasuk = reminderMasuk;
+  if (typeof reminderPulang === "boolean") updateData.reminderPulang = reminderPulang;
+  if (typeof monthlySummary === "boolean") updateData.monthlySummary = monthlySummary;
+
+  if (existing) {
+    await supabase.from("NotificationPreference").update(updateData).eq("userId", userId);
+  } else {
+    await supabase.from("NotificationPreference").insert({
+      userId,
       reminderMasuk: reminderMasuk ?? true,
       reminderPulang: reminderPulang ?? true,
       monthlySummary: monthlySummary ?? false,
-    },
-  });
+    });
+  }
 
   return apiSuccess({
-    reminderMasuk: prefs.reminderMasuk,
-    reminderPulang: prefs.reminderPulang,
-    monthlySummary: prefs.monthlySummary,
+    reminderMasuk: reminderMasuk ?? existing?.reminderMasuk ?? true,
+    reminderPulang: reminderPulang ?? existing?.reminderPulang ?? true,
+    monthlySummary: monthlySummary ?? existing?.monthlySummary ?? false,
   });
 });

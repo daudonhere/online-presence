@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getSupabase } from "@/lib/supabase";
 import { saveFile, UploadError } from "@/lib/upload";
 import { apiError, apiSuccess, withErrorHandling } from "@/lib/api-response";
 
@@ -23,17 +23,26 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
     return apiError("Gagal upload avatar", 500);
   }
 
-  await prisma.profile.upsert({
-    where: { userId: Number(session.user.id) },
-    update: { avatarUrl: url },
-    create: {
-      userId: Number(session.user.id),
+  const userId = Number(session.user.id);
+  const supabase = getSupabase();
+
+  const { data: existing } = await supabase
+    .from("Profile")
+    .select("userId")
+    .eq("userId", userId)
+    .single();
+
+  if (existing) {
+    await supabase.from("Profile").update({ avatarUrl: url }).eq("userId", userId);
+  } else {
+    await supabase.from("Profile").insert({
+      userId,
       subject: "",
       nip: "",
       email: "",
       avatarUrl: url,
-    },
-  });
+    });
+  }
 
   return apiSuccess({ avatarUrl: url });
 });

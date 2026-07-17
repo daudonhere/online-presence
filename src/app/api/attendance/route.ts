@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getSupabase } from "@/lib/supabase";
 import { apiError, apiSuccess, withErrorHandling } from "@/lib/api-response";
 import { attendanceSchema } from "@/lib/validations";
 
@@ -12,20 +12,21 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
   const month = searchParams.get("month");
   const year = searchParams.get("year");
 
-  const where: Record<string, unknown> = { userId: Number(session.user.id) };
+  let query = getSupabase()
+    .from("Attendance")
+    .select("*")
+    .eq("userId", Number(session.user.id));
 
   if (month && year) {
-    const startDate = new Date(Number(year), Number(month) - 1, 1);
-    const endDate = new Date(Number(year), Number(month), 0);
-    where.date = { gte: startDate, lte: endDate };
+    const startDate = new Date(Number(year), Number(month) - 1, 1).toISOString().split("T")[0];
+    const endDate = new Date(Number(year), Number(month), 0).toISOString().split("T")[0];
+    query = query.gte("date", startDate).lte("date", endDate);
   }
 
-  const records = await prisma.attendance.findMany({
-    where,
-    orderBy: { date: "desc" },
-  });
+  const { data, error } = await query.order("date", { ascending: false });
+  if (error) throw error;
 
-  return apiSuccess(records);
+  return apiSuccess(data);
 });
 
 export const POST = withErrorHandling(async (req: NextRequest) => {
@@ -41,33 +42,37 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
 
   const { date, time, notes } = result.data;
   const userId = Number(session.user.id);
-  const dateObj = new Date(date);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  dateObj.setHours(0, 0, 0, 0);
+  const dateStr = new Date(date).toISOString().split("T")[0];
+  const todayStr = new Date().toISOString().split("T")[0];
 
-  if (dateObj.getTime() !== today.getTime()) {
+  if (dateStr !== todayStr) {
     return apiError("Absensi hanya bisa dilakukan untuk hari ini");
   }
 
-  const existing = await prisma.attendance.findUnique({
-    where: { userId_date: { userId, date: dateObj } },
-  });
+  const { data: existing } = await getSupabase()
+    .from("Attendance")
+    .select("id")
+    .eq("userId", userId)
+    .eq("date", dateStr)
+    .single();
 
   if (existing) {
     return apiError("Anda sudah melakukan absensi hari ini");
   }
 
-  const record = await prisma.attendance.create({
-    data: {
+  const { data: record, error } = await getSupabase()
+    .from("Attendance")
+    .insert({
       userId,
-      date: dateObj,
+      date: dateStr,
       checkInTime: time,
       notes: notes || null,
       status: "pending",
       source: "manual",
-    },
-  });
+    })
+    .select()
+    .single();
 
+  if (error) throw error;
   return apiSuccess(record, 201);
 });

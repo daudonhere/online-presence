@@ -1,12 +1,10 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { PrismaAdapter } from "@auth/prisma-adapter";
-import { prisma } from "@/lib/prisma";
+import { getSupabase } from "@/lib/supabase";
 import { compare } from "bcryptjs";
 import { checkRateLimit, resetRateLimit } from "@/lib/rate-limit";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
   pages: {
     signIn: "/auth",
@@ -26,7 +24,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const { allowed } = checkRateLimit(`login:${phone}`, 5, 60000);
         if (!allowed) return null;
 
-        const user = await prisma.user.findUnique({ where: { phone } });
+        const { data: user } = await getSupabase()
+          .from("User")
+          .select("*")
+          .eq("phone", phone)
+          .single();
+
         if (!user) return null;
 
         const valid = await compare(password, user.password);

@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getSupabase } from "@/lib/supabase";
 import { apiError, withErrorHandling } from "@/lib/api-response";
 import { readFile, stat } from "fs/promises";
 import { join } from "path";
@@ -13,7 +13,12 @@ export const GET = withErrorHandling(async (req: NextRequest, ctx?: unknown) => 
   const reportId = parseInt(params.id);
   if (isNaN(reportId)) return apiError("ID tidak valid", 400);
 
-  const report = await prisma.report.findUnique({ where: { id: reportId } });
+  const { data: report } = await getSupabase()
+    .from("Report")
+    .select("*")
+    .eq("id", reportId)
+    .single();
+
   if (!report) return apiError("Laporan tidak ditemukan", 404);
 
   const filePath = join(process.cwd(), "public", report.fileUrl);

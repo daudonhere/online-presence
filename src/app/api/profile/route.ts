@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/prisma";
+import { getSupabase } from "@/lib/supabase";
 import { apiError, apiSuccess, withErrorHandling } from "@/lib/api-response";
 import { profileUpdateSchema } from "@/lib/validations";
 
@@ -8,20 +8,24 @@ export const GET = withErrorHandling(async () => {
   const session = await auth();
   if (!session?.user?.id) return apiError("Unauthorized", 401);
 
-  const user = await prisma.user.findUnique({
-    where: { id: Number(session.user.id) },
-    include: { profile: true },
-  });
+  const userId = Number(session.user.id);
+  const supabase = getSupabase();
+
+  const { data: user } = await supabase
+    .from("User")
+    .select("id, name, phone, role")
+    .eq("id", userId)
+    .single();
 
   if (!user) return apiError("User tidak ditemukan", 404);
 
-  return apiSuccess({
-    id: user.id,
-    name: user.name,
-    phone: user.phone,
-    role: user.role,
-    profile: user.profile,
-  });
+  const { data: profile } = await supabase
+    .from("Profile")
+    .select("*")
+    .eq("userId", userId)
+    .single();
+
+  return apiSuccess({ ...user, profile });
 });
 
 export const PUT = withErrorHandling(async (req: NextRequest) => {
@@ -37,36 +41,49 @@ export const PUT = withErrorHandling(async (req: NextRequest) => {
 
   const { name, subject, nip, email, phone } = result.data;
   const userId = Number(session.user.id);
+  const supabase = getSupabase();
 
   if (phone && phone !== (session.user as unknown as { phone: string }).phone) {
-    const existing = await prisma.user.findUnique({ where: { phone } });
+    const { data: existing } = await supabase
+      .from("User")
+      .select("id")
+      .eq("phone", phone)
+      .single();
+
     if (existing && existing.id !== userId) {
       return apiError("Nomor telepon sudah digunakan", 409);
     }
   }
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      ...(name && { name }),
-      ...(phone && { phone }),
-    },
-  });
+  const userUpdate: Record<string, unknown> = {};
+  if (name) userUpdate.name = name;
+  if (phone) userUpdate.phone = phone;
+  if (Object.keys(userUpdate).length > 0) {
+    await supabase.from("User").update(userUpdate).eq("id", userId);
+  }
 
-  await prisma.profile.upsert({
-    where: { userId },
-    update: {
-      ...(subject !== undefined && { subject }),
-      ...(nip !== undefined && { nip }),
-      ...(email !== undefined && { email }),
-    },
-    create: {
+  const { data: existingProfile } = await supabase
+    .from("Profile")
+    .select("userId")
+    .eq("userId", userId)
+    .single();
+
+  if (existingProfile) {
+    const profileUpdate: Record<string, unknown> = {};
+    if (subject !== undefined) profileUpdate.subject = subject;
+    if (nip !== undefined) profileUpdate.nip = nip;
+    if (email !== undefined) profileUpdate.email = email;
+    if (Object.keys(profileUpdate).length > 0) {
+      await supabase.from("Profile").update(profileUpdate).eq("userId", userId);
+    }
+  } else {
+    await supabase.from("Profile").insert({
       userId,
       subject: subject || "",
       nip: nip || "",
       email: email || "",
-    },
-  });
+    });
+  }
 
   return apiSuccess({ message: "Profil berhasil diperbarui" });
 });
