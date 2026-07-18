@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   ArrowLeft,
   UserRound,
@@ -150,7 +151,7 @@ export default function GuruDetailPage() {
           <div className="relative mt-4 flex items-center gap-4">
             <div className="h-16 w-16 rounded-2xl bg-white/20 flex items-center justify-center ring-2 ring-[#ffff00]/40">
               {profile?.avatarUrl ? (
-                <img src={profile.avatarUrl} alt={user.name} className="h-full w-full rounded-2xl object-cover" />
+                <Image src={profile.avatarUrl} alt={user.name} width={64} height={64} unoptimized className="h-full w-full rounded-2xl object-cover" />
               ) : (
                 <UserRound className="text-2xl text-white" />
               )}

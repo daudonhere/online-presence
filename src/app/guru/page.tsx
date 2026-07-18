@@ -9,6 +9,7 @@ import {
   UserRound,
 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { DashboardLayout } from "@/components/layout";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
@@ -119,9 +120,12 @@ export default function GuruListPage() {
                 <div className="flex items-center gap-3">
                   <div className="h-12 w-12 shrink-0 rounded-2xl bg-gradient-to-br from-[#1b8659] to-[#0c6b46] flex items-center justify-center">
                     {teacher.avatarUrl ? (
-                      <img
+                      <Image
                         src={teacher.avatarUrl}
                         alt={teacher.name}
+                        width={48}
+                        height={48}
+                        unoptimized
                         className="h-full w-full rounded-2xl object-cover"
                       />
                     ) : (
