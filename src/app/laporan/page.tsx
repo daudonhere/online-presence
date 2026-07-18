@@ -161,7 +161,7 @@ const STATUS_COLOR: Record<string, string> = {
 function buildTeacherTableHtml(teachers: TeacherDayRow[], totalDays: number): string {
   let headerDays = "";
   for (let d = 1; d <= totalDays; d++) {
-    headerDays += `<th style="padding:6px 4px;border:1px solid #e2e8f0;font-size:10px;text-align:center;width:24px;min-width:24px">${d}</th>`;
+    headerDays += `<th style="padding:3px 2px;border:1px solid #e2e8f0;font-size:7px;text-align:center;width:20px;min-width:14px">${d}</th>`;
   }
 
   const rows = teachers.map((t, i) => {
@@ -171,25 +171,25 @@ function buildTeacherTableHtml(teachers: TeacherDayRow[], totalDays: number): st
       const color = STATUS_COLOR[code] || "#e2e8f0";
       const bg = code ? color : "#f8fafc";
       const textColor = code ? "#fff" : "#cbd5e1";
-      cells += `<td style="padding:4px;border:1px solid #e2e8f0;text-align:center;font-size:10px;font-weight:700;background:${bg};color:${textColor}">${code}</td>`;
+      cells += `<td style="padding:2px;border:1px solid #e2e8f0;text-align:center;font-size:7px;font-weight:700;background:${bg};color:${textColor}">${code}</td>`;
     }
     return `<tr>
-      <td style="padding:6px 8px;border:1px solid #e2e8f0;font-size:11px;text-align:center">${i + 1}</td>
-      <td style="padding:6px 8px;border:1px solid #e2e8f0;font-size:11px;font-weight:600;white-space:nowrap">${t.teacherName}</td>
+      <td style="padding:2px 4px;border:1px solid #e2e8f0;font-size:8px;text-align:center">${i + 1}</td>
+      <td style="padding:2px 6px;border:1px solid #e2e8f0;font-size:8px;font-weight:600;white-space:nowrap">${t.teacherName}</td>
       ${cells}
-      <td style="padding:6px 8px;border:1px solid #e2e8f0;font-size:11px;font-weight:800;text-align:center">${t.totalHadir}</td>
+      <td style="padding:2px 4px;border:1px solid #e2e8f0;font-size:8px;font-weight:800;text-align:center">${t.totalHadir}</td>
     </tr>`;
   }).join("");
 
   return `
-    <div style="overflow-x:auto">
-    <table style="border-collapse:collapse;width:100%;margin-top:12px">
+    <div style="transform-origin:top left">
+    <table style="border-collapse:collapse;margin-top:12px;font-size:9px">
       <thead>
         <tr>
-          <th style="padding:6px 8px;border:1px solid #e2e8f0;font-size:11px;text-align:center;background:#0c6b46;color:#fff;width:30px">No</th>
-          <th style="padding:6px 8px;border:1px solid #e2e8f0;font-size:11px;text-align:left;background:#0c6b46;color:#fff;white-space:nowrap">Nama Guru</th>
+          <th style="padding:3px 4px;border:1px solid #e2e8f0;font-size:8px;text-align:center;background:#0c6b46;color:#fff;width:24px">No</th>
+          <th style="padding:3px 6px;border:1px solid #e2e8f0;font-size:8px;text-align:left;background:#0c6b46;color:#fff;white-space:nowrap">Nama Guru</th>
           ${headerDays}
-          <th style="padding:6px 8px;border:1px solid #e2e8f0;font-size:10px;text-align:center;background:#0c6b46;color:#fff;white-space:nowrap">Total</th>
+          <th style="padding:3px 4px;border:1px solid #e2e8f0;font-size:8px;text-align:center;background:#0c6b46;color:#fff;white-space:nowrap">Total</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -228,15 +228,27 @@ function exportPDF(report: ReportCard) {
   const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>${report.title}</title>
 <style>
-body{font-family:Arial,sans-serif;padding:40px;color:#0f172a}
+body{font-family:Arial,sans-serif;padding:40px;color:#0f172a;overflow:hidden}
 h1{font-size:20px;margin-bottom:4px}
 p{color:#64748b;font-size:13px;margin-top:2px}
 hr{border:none;border-top:1px solid #e2e8f0;margin:20px 0}
 @media print{
-  @page{size:landscape;margin:10mm}
-  body{padding:0}
+  @page{size:landscape;margin:8mm}
+  body{padding:0;overflow:hidden}
+  html{overflow:hidden}
 }
-</style></head><body>
+</style>
+<script>
+window.onload=function(){
+  var el=document.querySelector("div[style*='transform']");
+  if(el){
+    var tw=el.scrollWidth;
+    var pw=window.innerWidth-20;
+    if(tw>pw){el.style.transform="scale("+pw/tw+")";}
+  }
+}
+</script>
+</head><body>
 <h1>${report.title}</h1><p>${report.period}</p><hr>
 ${body}
 <hr><p style="font-size:11px;color:#94a3b8">Dibuat pada ${new Date().toLocaleDateString("id-ID")} — Absensi Al-Riyadl</p>
