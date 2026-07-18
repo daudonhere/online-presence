@@ -6,7 +6,8 @@ const withPWA = withPWAInit({
   register: true,
   skipWaiting: true,
   disable: process.env.NODE_ENV === "development",
-});
+  swSrc: "src/sw.ts",
+} as Record<string, unknown>);
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,

@@ -4,6 +4,34 @@ import { getSupabase } from "@/lib/supabase";
 import { apiError, apiSuccess, withErrorHandling } from "@/lib/api-response";
 import { scanSchema } from "@/lib/validations";
 
+function parseDms(dms: string): { lat: number; lng: number } | null {
+  const match = dms.match(
+    /(\d+)°(\d+)'([\d.]+)"([NS])\s+(\d+)°(\d+)'([\d.]+)"([EW])/i
+  );
+  if (!match) return null;
+
+  const lat =
+    (Number(match[1]) + Number(match[2]) / 60 + Number(match[3]) / 3600) *
+    (match[4].toUpperCase() === "S" ? -1 : 1);
+  const lng =
+    (Number(match[5]) + Number(match[6]) / 60 + Number(match[7]) / 3600) *
+    (match[8].toUpperCase() === "W" ? -1 : 1);
+
+  return { lat, lng };
+}
+
+function haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371e3;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLng = ((lng2 - lng1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 export const POST = withErrorHandling(async (req: NextRequest) => {
   const session = await auth();
   if (!session?.user?.id) return apiError("Unauthorized", 401);
@@ -15,7 +43,7 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
     return apiError(result.error.issues[0].message, 400);
   }
 
-  const { qrData } = result.data;
+  const { qrData, latitude, longitude } = result.data;
   const supabase = getSupabase();
 
   const match = qrData.match(/^ATTENDANCE:USER:(\d+):(.+)$/);
@@ -50,6 +78,33 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
     attendanceUserId = qrUserId;
   } else {
     return apiError("Scan tidak valid. Guru harus scan QR admin, atau admin harus scan QR guru.");
+  }
+
+  // Geofence: fetch admin's profile location
+  let adminUserId: number;
+  if (currentUser?.role === "teacher") {
+    adminUserId = qrUserId;
+  } else {
+    adminUserId = currentUserId;
+  }
+
+  const { data: adminProfile } = await supabase
+    .from("Profile")
+    .select("location")
+    .eq("userId", adminUserId)
+    .single();
+
+  const locationStr = adminProfile?.location?.trim();
+  if (locationStr) {
+    const adminLoc = parseDms(locationStr);
+    if (adminLoc) {
+      const dist = haversine(latitude, longitude, adminLoc.lat, adminLoc.lng);
+      if (dist > 10) {
+        return apiError(
+          `Anda berada ${(dist / 1000).toFixed(1)} km dari lokasi sekolah. Harus berada dalam radius 10 meter.`
+        );
+      }
+    }
   }
 
   const todayStr = new Date().toISOString().split("T")[0];

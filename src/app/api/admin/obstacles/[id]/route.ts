@@ -65,7 +65,8 @@ export const PATCH = withErrorHandling(
 
     if (action === "approved") {
       let attendanceStatus = "izin";
-      if (obstacle.category === "cuti") attendanceStatus = "libur";
+      if (obstacle.category === "sakit") attendanceStatus = "sakit";
+      else if (obstacle.category === "cuti") attendanceStatus = "libur";
 
       const { data: existing } = await getSupabase()
         .from("Attendance")

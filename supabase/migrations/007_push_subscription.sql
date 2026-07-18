@@ -14,3 +14,6 @@ CREATE TABLE IF NOT EXISTS "PushSubscription" (
 -- Index for faster lookups
 CREATE INDEX IF NOT EXISTS idx_push_subscription_user_id ON "PushSubscription"(userId);
 CREATE INDEX IF NOT EXISTS idx_push_subscription_endpoint ON "PushSubscription"(endpoint);
+
+-- Add location column to Profile table
+ALTER TABLE "Profile" ADD COLUMN IF NOT EXISTS location TEXT DEFAULT '';

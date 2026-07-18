@@ -19,16 +19,17 @@ type ScanState = "idle" | "scanning" | "success" | "error" | "no-permission";
 export default function ScanPage() {
   const [scanState, setScanState] = useState<ScanState>("idle");
   const [scannedResult, setScannedResult] = useState<string>("");
+  const [geoError, setGeoError] = useState<string>("");
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
 
   const submitMutation = useMutation({
-    mutationFn: async (qrData: string) => {
+    mutationFn: async ({ qrData, latitude, longitude }: { qrData: string; latitude: number; longitude: number }) => {
       const res = await fetch("/api/scan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ qrData }),
+        body: JSON.stringify({ qrData, latitude, longitude }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal mengirim absensi.");
@@ -110,7 +111,26 @@ export default function ScanPage() {
 
   const handleSubmit = () => {
     if (!scannedResult || submitMutation.isPending) return;
-    submitMutation.mutate(scannedResult);
+    setGeoError("");
+
+    if (!navigator.geolocation) {
+      setGeoError("Perangkat tidak mendukung GPS");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        submitMutation.mutate({
+          qrData: scannedResult,
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+        });
+      },
+      () => {
+        setGeoError("Gagal mendapatkan lokasi. Aktifkan GPS lalu coba lagi.");
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
   };
 
   return (
@@ -261,6 +281,9 @@ export default function ScanPage() {
                 </button>
                 {submitMutation.isError && (
                   <p className="text-sm text-red-500 font-medium text-center">{submitMutation.error.message}</p>
+                )}
+                {geoError && !submitMutation.isError && (
+                  <p className="text-sm text-red-500 font-medium text-center">{geoError}</p>
                 )}
               </>
             )}

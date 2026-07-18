@@ -15,6 +15,7 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
+  MapPin,
 } from "lucide-react";
 import { useRef, useState, useCallback } from "react";
 import { useSession, signOut } from "next-auth/react";
@@ -54,6 +55,7 @@ interface ProfileData {
     nip?: string;
     email?: string;
     avatarUrl?: string;
+    location?: string;
   };
 }
 
@@ -74,6 +76,7 @@ export default function PengaturanPage() {
     nip: "",
     email: "",
     phone: "",
+    location: "",
   });
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -89,6 +92,7 @@ export default function PengaturanPage() {
   const [profileMsg, setProfileMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [avatarMsg, setAvatarMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [notifMsg, setNotifMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [locationMsg, setLocationMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
 
   const { isLoading: loading } = useQuery<ProfileData>({
@@ -103,6 +107,7 @@ export default function PengaturanPage() {
         nip: data.profile?.nip || "",
         email: data.profile?.email || "",
         phone: data.phone || "",
+        location: data.profile?.location || "",
       });
       if (data.profile?.avatarUrl) {
         setProfileImage(data.profile.avatarUrl);
@@ -200,6 +205,31 @@ export default function PengaturanPage() {
     saveProfileMutation.mutate(profile);
   };
 
+  const saveLocationMutation = useMutation({
+    mutationFn: async (location: string) => {
+      const res = await fetch("/api/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ location }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Gagal menyimpan lokasi");
+      return result;
+    },
+    onSuccess: () => {
+      setLocationMsg({ type: "success", text: "Lokasi berhasil disimpan" });
+      queryClient.invalidateQueries({ queryKey: queryKeys.profile });
+    },
+    onError: (error: Error) => {
+      setLocationMsg({ type: "error", text: error.message });
+    },
+  });
+
+  const handleSaveLocation = () => {
+    setLocationMsg(null);
+    saveLocationMutation.mutate(profile.location);
+  };
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -222,33 +252,29 @@ export default function PengaturanPage() {
 
         if (!existing) {
           const permission = await Notification.requestPermission();
-          if (permission !== "granted") {
-            setNotifMsg({ type: "error", text: "Izin notifikasi diperlukan untuk mengaktifkan fitur ini" });
-            return;
+          if (permission === "granted") {
+            const sub = await reg.pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: urlBase64ToUint8Array(
+                process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
+              ) as BufferSource,
+            });
+            const json = sub.toJSON();
+            const keys = json.keys as { p256dh: string; auth: string };
+
+            await fetch("/api/push/subscribe", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                endpoint: sub.endpoint,
+                p256dh: keys.p256dh,
+                auth: keys.auth,
+              }),
+            });
           }
-
-          const sub = await reg.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(
-              process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
-            ) as BufferSource,
-          });
-          const json = sub.toJSON();
-          const keys = json.keys as { p256dh: string; auth: string };
-
-          await fetch("/api/push/subscribe", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              endpoint: sub.endpoint,
-              p256dh: keys.p256dh,
-              auth: keys.auth,
-            }),
-          });
         }
       } catch {
-        setNotifMsg({ type: "error", text: "Gagal mengaktifkan push notification" });
-        return;
+        // push subscription failed, still save the toggle
       }
     }
 
@@ -481,6 +507,41 @@ export default function PengaturanPage() {
             </div>
           <ChevronRight className="text-xl text-slate-400" />
         </button>
+
+        {session?.user?.role === "admin" && (
+          <div className="mt-4 rounded-2xl bg-slate-50 px-4 py-3">
+            <div className="flex items-center gap-2">
+              <MapPin className="text-base text-amber-500 shrink-0" />
+              <p className="text-xs font-medium text-slate-500">Lokasi Absensi</p>
+            </div>
+            <input
+              type="text"
+              value={profile.location}
+              onChange={(e) => handleProfileChange("location", e.target.value)}
+              disabled={loading}
+              className="mt-1 w-full bg-transparent text-sm font-bold text-slate-900 outline-none disabled:opacity-50"
+              placeholder="Contoh: 6°44'26.7&quot;S 107°02'18.3&quot;E"
+            />
+            <p className="mt-1 text-[10px] text-slate-400">Koordinat lokasi sekolah untuk verifikasi kehadiran guru</p>
+            {locationMsg && (
+              <div className={`mt-2 flex items-center gap-1.5 text-xs font-medium ${locationMsg.type === "success" ? "text-emerald-600" : "text-red-500"}`}>
+                {locationMsg.type === "success" ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> : <AlertCircle className="h-3.5 w-3.5 shrink-0" />}
+                {locationMsg.text}
+              </div>
+            )}
+            <button
+              onClick={handleSaveLocation}
+              disabled={loading || saveLocationMutation.isPending}
+              className="mt-3 w-full rounded-xl bg-amber-500 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-amber-600 disabled:opacity-50"
+            >
+              {saveLocationMutation.isPending ? (
+                <Loader2 className="mx-auto h-4 w-4 animate-spin" />
+              ) : (
+                "Simpan Lokasi"
+              )}
+            </button>
+          </div>
+        )}
       </section>
 
       <section className="mt-4 rounded-[28px] bg-white p-4 shadow-card ring-1 ring-slate-100">

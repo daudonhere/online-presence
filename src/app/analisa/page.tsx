@@ -255,8 +255,6 @@ export default function AnalisaPage() {
                         className={`rounded-2xl px-1 py-2 ${
                           isToday
                             ? "bg-[#ffff00] ring-2 ring-[#1b8659] text-[#003d7a]"
-                            : day.hadir > 0
-                            ? "bg-[#1b8659] text-white"
                             : "bg-slate-200 text-slate-500"
                         }`}
                       >

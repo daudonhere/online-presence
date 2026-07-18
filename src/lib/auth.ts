@@ -52,6 +52,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.id = user.id;
         token.phone = (user as unknown as { phone: string }).phone;
         token.role = (user as unknown as { role: string }).role;
+      } else if (token.id) {
+        const { data } = await getSupabase()
+          .from("User")
+          .select("name, phone, role")
+          .eq("id", Number(token.id))
+          .single();
+        if (data) {
+          token.name = data.name;
+          token.phone = data.phone;
+          token.role = data.role;
+        }
       }
       return token;
     },

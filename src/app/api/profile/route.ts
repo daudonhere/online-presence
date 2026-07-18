@@ -39,7 +39,7 @@ export const PUT = withErrorHandling(async (req: NextRequest) => {
     return apiError(result.error.issues[0].message, 400);
   }
 
-  const { name, subject, nip, email, phone } = result.data;
+  const { name, subject, nip, email, phone, location } = result.data;
   const userId = Number(session.user.id);
   const supabase = getSupabase();
 
@@ -73,6 +73,7 @@ export const PUT = withErrorHandling(async (req: NextRequest) => {
     if (subject !== undefined) profileUpdate.subject = subject;
     if (nip !== undefined) profileUpdate.nip = nip;
     if (email !== undefined) profileUpdate.email = email;
+    if (location !== undefined) profileUpdate.location = location;
     if (Object.keys(profileUpdate).length > 0) {
       await supabase.from("Profile").update(profileUpdate).eq("userId", userId);
     }

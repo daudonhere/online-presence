@@ -89,7 +89,7 @@ const months = [
   { value: 12, label: "Desember" },
 ];
 
-const years = Array.from({ length: 3 }, (_, i) => new Date().getFullYear() - i);
+const years = Array.from({ length: 3 }, (_, i) => new Date().getFullYear() - i).sort((a, b) => a - b);
 
 function mapReport(api: ApiReport): ReportCard {
   const style = typeStyles[api.type] || typeStyles.rekap;
@@ -405,9 +405,9 @@ export default function LaporanPage() {
                     <button
                       type="button"
                       onClick={() => exportExcel(report, monthName)}
-                      className="min-h-[48px] rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-black text-[#1b8659] transition hover:scale-[0.98] flex items-center justify-center gap-2"
+                      className="min-h-[48px] rounded-2xl bg-[#1b8659] px-4 py-3 text-sm font-black text-white transition hover:scale-[0.98] flex items-center justify-center gap-2"
                     >
-                      <FileText className="text-lg" />
+                      <FileText className="text-lg text-white" />
                       Excel
                     </button>
                   </div>

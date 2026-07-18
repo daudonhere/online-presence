@@ -30,6 +30,7 @@ export const profileUpdateSchema = z.object({
     .string()
     .regex(/^0[0-9]{9,13}$/, "Format nomor telepon tidak valid")
     .optional(),
+  location: z.string().max(100).optional().transform(v => v ? sanitize(v) : v),
 });
 
 export const attendanceSchema = z.object({
@@ -63,4 +64,6 @@ export const scanSchema = z.object({
     .string()
     .min(1, "Data QR tidak boleh kosong")
     .regex(/^ATTENDANCE:USER:\d+:.+$/, "Format QR tidak valid"),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
 });

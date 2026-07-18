@@ -16,8 +16,8 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <footer className="shrink-0 fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 pb-[34px]">
-      <nav className="grid grid-cols-5 px-2 pt-2" aria-label="Navigasi utama">
+    <footer className="shrink-0 fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-slate-200 pb-[34px] rounded-t-3xl shadow-[0_-4px_20px_rgba(0,0,0,0.06)]">
+      <nav className="grid grid-cols-5 px-2 pt-1.5" aria-label="Navigasi utama">
         {navItems.map((item) => {
           const isActive = item.href === "/"
             ? pathname === "/" || pathname === "/scan" || pathname === "/manual"
@@ -27,15 +27,15 @@ export function BottomNav() {
             <Link
               key={item.href}
               href={item.href}
-              className={`min-h-[56px] rounded-2xl flex flex-col items-center justify-center gap-1 ${
+              className={`min-h-[44px] rounded-2xl flex flex-col items-center justify-center gap-0.5 ${
                 isActive
                   ? "bg-[#1b8659] text-[#ffff00]"
                   : "text-slate-400 transition hover:text-[#1b8659]"
               }`}
             >
-              <Icon className="text-xl" />
+              <Icon className="text-lg" />
               <span
-                className={`text-[11px] ${
+                className={`text-[10px] ${
                   isActive ? "font-bold" : "font-semibold"
                 }`}
               >
