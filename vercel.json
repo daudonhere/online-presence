@@ -2,11 +2,11 @@
   "crons": [
     {
       "path": "/api/cron/reminder-masuk",
-      "schedule": "0 23 * * 0-4 UTC"
+      "schedule": "0 23 * * 0-4"
     },
     {
       "path": "/api/cron/monthly-summary",
-      "schedule": "0 1 1 * * UTC"
+      "schedule": "0 1 1 * *"
     }
   ]
 }
