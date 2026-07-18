@@ -4,19 +4,12 @@ import { getSupabase } from "@/lib/supabase";
 import { apiError, apiSuccess, withErrorHandling } from "@/lib/api-response";
 import { scanSchema } from "@/lib/validations";
 
-function parseDms(dms: string): { lat: number; lng: number } | null {
-  const match = dms.match(
-    /(\d+)°(\d+)'([\d.]+)"([NS])\s+(\d+)°(\d+)'([\d.]+)"([EW])/i
-  );
-  if (!match) return null;
-
-  const lat =
-    (Number(match[1]) + Number(match[2]) / 60 + Number(match[3]) / 3600) *
-    (match[4].toUpperCase() === "S" ? -1 : 1);
-  const lng =
-    (Number(match[5]) + Number(match[6]) / 60 + Number(match[7]) / 3600) *
-    (match[8].toUpperCase() === "W" ? -1 : 1);
-
+function parseDecimal(input: string): { lat: number; lng: number } | null {
+  const parts = input.split(",").map((s) => s.trim());
+  if (parts.length !== 2) return null;
+  const lat = parseFloat(parts[0]);
+  const lng = parseFloat(parts[1]);
+  if (isNaN(lat) || isNaN(lng)) return null;
   return { lat, lng };
 }
 
@@ -96,7 +89,7 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
 
   const locationStr = adminProfile?.location?.trim();
   if (locationStr) {
-    const adminLoc = parseDms(locationStr);
+    const adminLoc = parseDecimal(locationStr);
     if (adminLoc) {
       const dist = haversine(latitude, longitude, adminLoc.lat, adminLoc.lng);
       if (dist > 10) {

@@ -30,7 +30,10 @@ export const profileUpdateSchema = z.object({
     .string()
     .regex(/^0[0-9]{9,13}$/, "Format nomor telepon tidak valid")
     .optional(),
-  location: z.string().max(100).optional().transform(v => v ? sanitize(v) : v),
+  location: z.string().max(100).optional().refine(
+    (v) => !v || /^-?\d+\.?\d*\s*,\s*-?\d+\.?\d*$/.test(v),
+    "Format koordinat tidak valid. Contoh: -6.954097, 107.009786"
+  ).transform(v => v ? sanitize(v) : v),
 });
 
 export const attendanceSchema = z.object({

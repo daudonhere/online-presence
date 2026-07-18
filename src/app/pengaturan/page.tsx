@@ -520,9 +520,9 @@ export default function PengaturanPage() {
               onChange={(e) => handleProfileChange("location", e.target.value)}
               disabled={loading}
               className="mt-1 w-full bg-transparent text-sm font-bold text-slate-900 outline-none disabled:opacity-50"
-              placeholder="Contoh: 6°44'26.7&quot;S 107°02'18.3&quot;E"
+              placeholder="-6.954097, 107.009786"
             />
-            <p className="mt-1 text-[10px] text-slate-400">Koordinat lokasi sekolah untuk verifikasi kehadiran guru</p>
+            <p className="mt-1 text-[10px] text-slate-400">Format: -6.954097, 107.009786 (latitude, longitude)</p>
             {locationMsg && (
               <div className={`mt-2 flex items-center gap-1.5 text-xs font-medium ${locationMsg.type === "success" ? "text-emerald-600" : "text-red-500"}`}>
                 {locationMsg.type === "success" ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> : <AlertCircle className="h-3.5 w-3.5 shrink-0" />}
