@@ -3,6 +3,13 @@ import { auth } from "@/lib/auth";
 import { getSupabase } from "@/lib/supabase";
 import { apiError, apiSuccess, withErrorHandling } from "@/lib/api-response";
 
+interface TeacherDayRow {
+  teacherId: number;
+  teacherName: string;
+  days: Record<number, string>;
+  totalHadir: number;
+}
+
 export const GET = withErrorHandling(async (req: NextRequest) => {
   const session = await auth();
   if (!session?.user?.id) return apiError("Unauthorized", 401);
@@ -65,28 +72,86 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     type: string;
     stats?: Array<{ label: string; value: string }>;
     tags?: Array<{ label: string }>;
+    teachers?: TeacherDayRow[];
+    totalDays?: number;
   }> = [];
 
   if (role === "admin") {
-    const { data: allRecordsAdmin } = await supabase
+    const { data: teachers } = await supabase
+      .from("User")
+      .select("id, name")
+      .eq("role", "teacher")
+      .order("name", { ascending: true });
+
+    const { data: allAttendance } = await supabase
       .from("Attendance")
-      .select("*")
+      .select("userId, date, status")
       .gte("date", startDate)
       .lte("date", endDate);
 
-    const hasAnyData = (allRecordsAdmin || []).length > 0;
+    const { data: allObstacles } = await supabase
+      .from("Obstacle")
+      .select("userId, date, category, status")
+      .gte("date", startDate)
+      .lte("date", endDate)
+      .eq("status", "approved");
 
-    if (hasAnyData) {
-      const totalHadir = (allRecordsAdmin || []).filter((r) => r.status === "hadir").length;
+    const teacherList = teachers || [];
+    const attendanceList = allAttendance || [];
+    const obstacleList = allObstacles || [];
+
+    const obstacleStatusMap: Record<string, string> = {
+      sakit: "S",
+      izin: "I",
+      cuti: "C",
+    };
+
+    const teacherRows: TeacherDayRow[] = teacherList.map((t) => {
+      const days: Record<number, string> = {};
+      let totalHadir = 0;
+
+      for (let d = 1; d <= totalDays; d++) {
+        const dateStr = `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+        const att = attendanceList.find((a) => a.userId === t.id && a.date === dateStr);
+        const obs = obstacleList.find((o) => o.userId === t.id && o.date === dateStr);
+
+        if (att) {
+          if (att.status === "hadir") {
+            days[d] = "H";
+            totalHadir++;
+          } else if (att.status === "izin") {
+            days[d] = "I";
+          } else if (att.status === "alpha") {
+            days[d] = "A";
+          } else if (att.status === "libur") {
+            days[d] = "C";
+          }
+        } else if (obs) {
+          const mapped = obstacleStatusMap[obs.category];
+          if (mapped) {
+            days[d] = mapped;
+            if (mapped === "H") totalHadir++;
+          }
+        }
+      }
+
+      return { teacherId: t.id, teacherName: t.name, days, totalHadir };
+    });
+
+    const hasAnyData = attendanceList.length > 0 || obstacleList.length > 0;
+
+    if (hasAnyData || teacherList.length > 0) {
       reports.push({
         id: `rekap-${month}-${year}`,
         title: `Rekap Absensi Guru ${monthName}`,
         period: `Periode 01 - ${totalDays} ${new Date(year, month - 1).toLocaleString("id-ID", { month: "long" })} ${year}`,
         type: "rekap",
         stats: [
-          { label: "Hari Kerja", value: `${totalDays} hari` },
-          { label: "Hadir", value: `${totalHadir} hari` },
+          { label: "Guru", value: `${teacherList.length} orang` },
+          { label: "Hari", value: `${totalDays} hari` },
         ],
+        teachers: teacherRows,
+        totalDays,
       });
     }
   }

@@ -24,6 +24,13 @@ interface ApiTag {
   label: string;
 }
 
+interface TeacherDayRow {
+  teacherId: number;
+  teacherName: string;
+  days: Record<number, string>;
+  totalHadir: number;
+}
+
 interface ApiReport {
   id: string;
   title: string;
@@ -31,6 +38,8 @@ interface ApiReport {
   type: "rekap" | "personal" | "halangan";
   stats?: ApiStat[];
   tags?: ApiTag[];
+  teachers?: TeacherDayRow[];
+  totalDays?: number;
 }
 
 interface ApiResponse {
@@ -51,6 +60,8 @@ interface ReportCard {
   stats?: { label: string; value: string; color: string; bg: string }[];
   statsLayout?: string;
   tags?: { label: string; bg: string; color: string }[];
+  teachers?: TeacherDayRow[];
+  totalDays?: number;
 }
 
 const typeStyles: Record<
@@ -102,6 +113,8 @@ function mapReport(api: ApiReport): ReportCard {
     icon: style.icon,
     iconBg: style.iconBg,
     iconColor: style.iconColor,
+    teachers: api.teachers,
+    totalDays: api.totalDays,
   };
 
   if (api.stats) {
@@ -142,21 +155,95 @@ function downloadFile(content: string, filename: string, mimeType: string) {
   URL.revokeObjectURL(url);
 }
 
-function exportPDF(report: ReportCard) {
-  const rows = report.stats
-    ? report.stats.map((s) => `<tr><td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;font-weight:600;color:#475569">${s.label}</td><td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;font-weight:800;color:#0f172a">${s.value}</td></tr>`).join("")
-    : "";
+const STATUS_COLOR: Record<string, string> = {
+  H: "#1b8659",
+  S: "#dc2626",
+  I: "#d97706",
+  C: "#003d7a",
+  A: "#94a3b8",
+};
 
-  const tags = report.tags
-    ? report.tags.map((t) => `<span style="display:inline-block;padding:4px 12px;margin:2px;border-radius:999px;font-size:12px;font-weight:700;background:#f1f5f9;color:#334155">${t.label}</span>`).join("")
-    : "";
+function buildTeacherTableHtml(teachers: TeacherDayRow[], totalDays: number): string {
+  let headerDays = "";
+  for (let d = 1; d <= totalDays; d++) {
+    headerDays += `<th style="padding:6px 4px;border:1px solid #e2e8f0;font-size:10px;text-align:center;width:24px;min-width:24px">${d}</th>`;
+  }
+
+  const rows = teachers.map((t, i) => {
+    let cells = "";
+    for (let d = 1; d <= totalDays; d++) {
+      const code = t.days[d] || "";
+      const color = STATUS_COLOR[code] || "#e2e8f0";
+      const bg = code ? color : "#f8fafc";
+      const textColor = code ? "#fff" : "#cbd5e1";
+      cells += `<td style="padding:4px;border:1px solid #e2e8f0;text-align:center;font-size:10px;font-weight:700;background:${bg};color:${textColor}">${code}</td>`;
+    }
+    return `<tr>
+      <td style="padding:6px 8px;border:1px solid #e2e8f0;font-size:11px;text-align:center">${i + 1}</td>
+      <td style="padding:6px 8px;border:1px solid #e2e8f0;font-size:11px;font-weight:600;white-space:nowrap">${t.teacherName}</td>
+      ${cells}
+      <td style="padding:6px 8px;border:1px solid #e2e8f0;font-size:11px;font-weight:800;text-align:center">${t.totalHadir}</td>
+    </tr>`;
+  }).join("");
+
+  return `
+    <div style="overflow-x:auto">
+    <table style="border-collapse:collapse;width:100%;margin-top:12px">
+      <thead>
+        <tr>
+          <th style="padding:6px 8px;border:1px solid #e2e8f0;font-size:11px;text-align:center;background:#0c6b46;color:#fff;width:30px">No</th>
+          <th style="padding:6px 8px;border:1px solid #e2e8f0;font-size:11px;text-align:left;background:#0c6b46;color:#fff;white-space:nowrap">Nama Guru</th>
+          ${headerDays}
+          <th style="padding:6px 8px;border:1px solid #e2e8f0;font-size:10px;text-align:center;background:#0c6b46;color:#fff;white-space:nowrap">Total</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    </div>
+    <div style="margin-top:12px;font-size:10px;color:#64748b">
+      <strong>Keterangan:</strong>
+      <span style="color:#1b8659">H</span> = Hadir &nbsp;
+      <span style="color:#dc2626">S</span> = Sakit &nbsp;
+      <span style="color:#d97706">I</span> = Izin &nbsp;
+      <span style="color:#003d7a">C</span> = Cuti &nbsp;
+      <span style="color:#94a3b8">A</span> = Alpha
+    </div>
+  `;
+}
+
+function exportPDF(report: ReportCard) {
+  let body = "";
+
+  if (report.teachers && report.totalDays) {
+    body = buildTeacherTableHtml(report.teachers, report.totalDays);
+  } else if (report.stats) {
+    const rows = report.stats.map((s) =>
+      `<tr><td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;font-weight:600;color:#475569">${s.label}</td><td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;font-weight:800;color:#0f172a">${s.value}</td></tr>`
+    ).join("");
+    body = `<table style="width:100%;border-collapse:collapse;margin-top:16px">${rows}</table>`;
+  }
+
+  if (report.tags) {
+    const tags = report.tags.map((t) =>
+      `<span style="display:inline-block;padding:4px 12px;margin:2px;border-radius:999px;font-size:12px;font-weight:700;background:#f1f5f9;color:#334155">${t.label}</span>`
+    ).join("");
+    body += `<div style="margin-top:12px">${tags}</div>`;
+  }
 
   const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>${report.title}</title>
-<style>body{font-family:Arial,sans-serif;padding:40px;color:#0f172a}h1{font-size:20px;margin-bottom:4px}p{color:#64748b;font-size:13px;margin-top:2px}table{width:100%;border-collapse:collapse;margin-top:16px}hr{border:none;border-top:1px solid #e2e8f0;margin:20px 0}</style></head><body>
+<style>
+body{font-family:Arial,sans-serif;padding:40px;color:#0f172a}
+h1{font-size:20px;margin-bottom:4px}
+p{color:#64748b;font-size:13px;margin-top:2px}
+hr{border:none;border-top:1px solid #e2e8f0;margin:20px 0}
+@media print{
+  @page{size:landscape;margin:10mm}
+  body{padding:0}
+}
+</style></head><body>
 <h1>${report.title}</h1><p>${report.period}</p><hr>
-${rows ? `<table>${rows}</table>` : ""}
-${tags ? `<div style="margin-top:12px">${tags}</div>` : ""}
+${body}
 <hr><p style="font-size:11px;color:#94a3b8">Dibuat pada ${new Date().toLocaleDateString("id-ID")} — Absensi Al-Riyadl</p>
 </body></html>`;
 
@@ -173,7 +260,22 @@ function exportExcel(report: ReportCard, monthName: string) {
   csv += `"${report.title}"\n`;
   csv += `"${report.period}"\n\n`;
 
-  if (report.stats) {
+  if (report.teachers && report.totalDays) {
+    csv += "No,Nama Guru";
+    for (let d = 1; d <= report.totalDays; d++) {
+      csv += `,${d}`;
+    }
+    csv += ",Total\n";
+
+    const td = report.totalDays || 0;
+    report.teachers.forEach((t, i) => {
+      csv += `${i + 1},"${t.teacherName}"`;
+      for (let d = 1; d <= td; d++) {
+        csv += `,${t.days[d] || ""}`;
+      }
+      csv += `,${t.totalHadir}\n`;
+    });
+  } else if (report.stats) {
     csv += "Label,Nilai\n";
     for (const s of report.stats) {
       csv += `"${s.label}","${s.value}"\n`;

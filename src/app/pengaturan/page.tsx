@@ -16,9 +16,11 @@ import {
   CheckCircle2,
   AlertCircle,
   MapPin,
+  Users,
 } from "lucide-react";
 import { useRef, useState, useCallback } from "react";
 import { useSession, signOut } from "next-auth/react";
+import Link from "next/link";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/layout";
 import { queryKeys } from "@/lib/query-keys";
@@ -479,6 +481,25 @@ export default function PengaturanPage() {
           )}
         </button>
       </section>
+
+      {session?.user?.role === "admin" && (
+        <Link href="/guru" className="mt-4 block rounded-[28px] bg-white p-4 shadow-card ring-1 ring-slate-100 transition hover:scale-[0.99]">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="h-11 w-11 rounded-2xl bg-blue-50 flex items-center justify-center">
+                <Users className="text-2xl text-[#003d7a]" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-[#1b8659]">Admin</p>
+                <h2 className="font-display text-xl font-bold tracking-tight text-slate-950">
+                  Manajemen Guru
+                </h2>
+              </div>
+            </div>
+            <ChevronRight className="text-xl text-slate-400" />
+          </div>
+        </Link>
+      )}
 
       <section className="mt-4 rounded-[28px] bg-white p-4 shadow-card ring-1 ring-slate-100">
         <div className="flex items-center justify-between gap-3">
