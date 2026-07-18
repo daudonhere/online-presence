@@ -16,12 +16,22 @@ import {
   CheckCircle2,
   AlertCircle,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useRef, useState, useCallback } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/layout";
 import { queryKeys } from "@/lib/query-keys";
-import { usePushSubscription } from "@/lib/hooks";
+
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
 
 const toggles = [
   {
@@ -80,7 +90,6 @@ export default function PengaturanPage() {
   const [avatarMsg, setAvatarMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [notifMsg, setNotifMsg] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
-  const { isSupported: pushSupported, isSubscribed: pushSubscribed, loading: pushLoading, subscribing: pushSubscribing, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushSubscription();
 
   const { isLoading: loading } = useQuery<ProfileData>({
     queryKey: queryKeys.profile,
@@ -202,12 +211,51 @@ export default function PengaturanPage() {
     uploadAvatarMutation.mutate(file);
   };
 
-  const toggleNotif = (key: keyof typeof notifStates) => {
-    const newState = { ...notifStates, [key]: !notifStates[key] };
-    setNotifStates(newState);
+  const toggleNotif = useCallback(async (key: keyof typeof notifStates) => {
+    const turningOn = !notifStates[key];
     setNotifMsg(null);
+
+    if (turningOn && "serviceWorker" in navigator && "PushManager" in window) {
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        const existing = await reg.pushManager.getSubscription();
+
+        if (!existing) {
+          const permission = await Notification.requestPermission();
+          if (permission !== "granted") {
+            setNotifMsg({ type: "error", text: "Izin notifikasi diperlukan untuk mengaktifkan fitur ini" });
+            return;
+          }
+
+          const sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(
+              process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!
+            ) as BufferSource,
+          });
+          const json = sub.toJSON();
+          const keys = json.keys as { p256dh: string; auth: string };
+
+          await fetch("/api/push/subscribe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              endpoint: sub.endpoint,
+              p256dh: keys.p256dh,
+              auth: keys.auth,
+            }),
+          });
+        }
+      } catch {
+        setNotifMsg({ type: "error", text: "Gagal mengaktifkan push notification" });
+        return;
+      }
+    }
+
+    const newState = { ...notifStates, [key]: turningOn };
+    setNotifStates(newState);
     saveNotifMutation.mutate(newState);
-  };
+  }, [notifStates, saveNotifMutation]);
 
   const handlePasswordSubmit = async () => {
     setPasswordMsg(null);
@@ -481,53 +529,6 @@ export default function PengaturanPage() {
           </div>
         )}
       </section>
-
-      {pushSupported && (
-        <section className="mt-4 rounded-[28px] bg-white p-4 shadow-card ring-1 ring-slate-100">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-[#1b8659]">Push Notification</p>
-              <h2 className="font-display text-xl font-bold tracking-tight text-slate-950">
-                Browser Push
-              </h2>
-            </div>
-            <div className="h-11 w-11 rounded-2xl bg-purple-50 flex items-center justify-center">
-              <BellRing className="text-2xl text-purple-600" />
-            </div>
-          </div>
-          <p className="mt-3 text-xs text-slate-500">
-            Aktifkan push notification untuk menerima pengingat absen dan notifikasi penting lainnya langsung di browser Anda.
-          </p>
-          <button
-            onClick={pushSubscribed ? pushUnsubscribe : pushSubscribe}
-            disabled={pushSubscribing || pushLoading}
-            className={`mt-4 min-h-[50px] w-full rounded-2xl px-5 py-3 text-sm font-black shadow-card transition hover:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 ${
-              pushSubscribed
-                ? "bg-red-50 text-red-600 ring-1 ring-red-200"
-                : "bg-[#1b8659] text-[#ffff00]"
-            }`}
-          >
-            {pushSubscribing ? (
-              <Loader2 className="text-xl animate-spin" />
-            ) : pushSubscribed ? (
-              <>
-                <BellRing className="text-xl" />
-                Nonaktifkan Push
-              </>
-            ) : (
-              <>
-                <BellRing className="text-xl" />
-                Aktifkan Push Notification
-              </>
-            )}
-          </button>
-          {pushSubscribed && (
-            <p className="mt-2 text-center text-xs font-medium text-[#1b8659]">
-              Push notification aktif
-            </p>
-          )}
-        </section>
-      )}
 
       <section className="mt-4 rounded-[28px] bg-white p-4 shadow-card ring-1 ring-red-100">
         <button

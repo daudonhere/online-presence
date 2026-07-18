@@ -2,7 +2,6 @@
 
 import {
   BarChart3,
-  CheckCircle2,
   ClipboardPen,
   CircleAlert,
   CalendarRange,

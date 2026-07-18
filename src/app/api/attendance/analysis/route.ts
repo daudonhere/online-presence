@@ -125,10 +125,8 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     .order("date", { ascending: true });
 
   const allRecords = records || [];
-  const hadir = allRecords.filter((r) => r.status === "hadir").length;
   const izin = allRecords.filter((r) => r.status === "izin").length;
   const alpha = allRecords.filter((r) => r.status === "alpha").length;
-  const libur = allRecords.filter((r) => r.status === "libur").length;
 
   const dailyChart: { day: number; hadir: number }[] = [];
   for (let d = 1; d <= totalDays; d++) {

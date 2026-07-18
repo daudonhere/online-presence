@@ -23,7 +23,6 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
 
   const startDate = new Date(year, month - 1, 1).toISOString().split("T")[0];
   const endDate = new Date(year, month, 0).toISOString().split("T")[0];
-  const totalDays = new Date(year, month, 0).getDate();
   const monthName = new Date(year, month - 1).toLocaleString("id-ID", { month: "long", year: "numeric" });
   const supabase = getSupabase();
 

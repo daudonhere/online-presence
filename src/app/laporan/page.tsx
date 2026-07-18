@@ -142,7 +142,7 @@ function downloadFile(content: string, filename: string, mimeType: string) {
   URL.revokeObjectURL(url);
 }
 
-function exportPDF(report: ReportCard, monthName: string) {
+function exportPDF(report: ReportCard) {
   const rows = report.stats
     ? report.stats.map((s) => `<tr><td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;font-weight:600;color:#475569">${s.label}</td><td style="padding:8px 12px;border-bottom:1px solid #e2e8f0;font-weight:800;color:#0f172a">${s.value}</td></tr>`).join("")
     : "";
@@ -396,7 +396,7 @@ export default function LaporanPage() {
                   <div className="mt-4 grid grid-cols-2 gap-3">
                     <button
                       type="button"
-                      onClick={() => exportPDF(report, monthName)}
+                      onClick={() => exportPDF(report)}
                       className="min-h-[48px] rounded-2xl bg-[#003d7a] px-4 py-3 text-sm font-black text-white transition hover:scale-[0.98] flex items-center justify-center gap-2"
                     >
                       <FileDown className="text-lg text-[#ffff00]" />
