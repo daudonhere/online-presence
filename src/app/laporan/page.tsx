@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import * as XLSX from "xlsx";
 import {
   FileDown,
   CalendarDays,
@@ -145,14 +146,8 @@ function mapReport(api: ApiReport): ReportCard {
   return mapped;
 }
 
-function downloadFile(content: string, filename: string, mimeType: string) {
-  const blob = new Blob(["\uFEFF" + content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+function downloadXlsx(wb: XLSX.WorkBook, filename: string) {
+  XLSX.writeFile(wb, filename, { bookType: "xlsx" });
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -256,43 +251,63 @@ ${body}
 }
 
 function exportExcel(report: ReportCard, monthName: string) {
-  let csv = "\uFEFF";
-  csv += `"${report.title}"\n`;
-  csv += `"${report.period}"\n\n`;
+  const wb = XLSX.utils.book_new();
+  const wsData: (string | number)[][] = [];
+
+  wsData.push([report.title]);
+  wsData.push([report.period]);
+  wsData.push([]);
 
   if (report.teachers && report.totalDays) {
-    csv += "No,Nama Guru";
+    const header = ["No", "Nama Guru"];
     for (let d = 1; d <= report.totalDays; d++) {
-      csv += `,${d}`;
+      header.push(String(d));
     }
-    csv += ",Total\n";
+    header.push("Total");
+    wsData.push(header);
 
-    const td = report.totalDays || 0;
+    const td = report.totalDays;
     report.teachers.forEach((t, i) => {
-      csv += `${i + 1},"${t.teacherName}"`;
+      const row: (string | number)[] = [i + 1, t.teacherName];
       for (let d = 1; d <= td; d++) {
-        csv += `,${t.days[d] || ""}`;
+        row.push(t.days[d] || "");
       }
-      csv += `,${t.totalHadir}\n`;
+      row.push(t.totalHadir);
+      wsData.push(row);
     });
   } else if (report.stats) {
-    csv += "Label,Nilai\n";
+    wsData.push(["Label", "Nilai"]);
     for (const s of report.stats) {
-      csv += `"${s.label}","${s.value}"\n`;
+      wsData.push([s.label, s.value]);
     }
   }
 
   if (report.tags) {
-    csv += "\nTag\n";
+    wsData.push([]);
+    wsData.push(["Keterangan"]);
     for (const t of report.tags) {
-      csv += `"${t.label}"\n`;
+      wsData.push([t.label]);
     }
   }
 
-  csv += `\nDibuat pada ${new Date().toLocaleDateString("id-ID")} — Absensi Al-Riyadl\n`;
+  wsData.push([]);
+  wsData.push([`Dibuat pada ${new Date().toLocaleDateString("id-ID")} — Absensi Al-Riyadl`]);
 
-  const filename = `${report.title.replace(/\s+/g, "_")}_${monthName.replace(/\s+/g, "_")}.csv`;
-  downloadFile(csv, filename, "text/csv;charset=utf-8");
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+  if (report.teachers && report.totalDays) {
+    ws["!cols"] = [
+      { wch: 4 },
+      { wch: 25 },
+      ...Array.from({ length: report.totalDays }, () => ({ wch: 4 })),
+      { wch: 6 },
+    ];
+  }
+
+  XLSX.utils.book_append_sheet(wb, ws, "Laporan");
+
+  const filename = `${report.title.replace(/\s+/g, "_")}_${monthName.replace(/\s+/g, "_")}.xlsx`;
+  downloadXlsx(wb, filename);
 }
 
 export default function LaporanPage() {
