@@ -363,11 +363,7 @@ export default function PengaturanPage() {
             onChange={handleImageUpload}
           />
           <div className="min-w-0 flex-1">
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.14em] text-white/90 ring-1 ring-white/15">
-              <span className="h-2 w-2 rounded-full bg-[#ffff00]" />
-              Profil Guru
-            </div>
-            <h1 className="mt-2 font-display text-lg font-bold tracking-tight truncate">
+            <h1 className="font-display text-lg font-bold tracking-tight truncate">
               {loading ? "..." : displayName}
             </h1>
             <p className="mt-1 text-sm font-medium text-white/80 truncate">

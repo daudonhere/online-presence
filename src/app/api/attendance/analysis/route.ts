@@ -124,9 +124,21 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     .lte("date", endDate)
     .order("date", { ascending: true });
 
+  const { data: obstacles } = await getSupabase()
+    .from("Obstacle")
+    .select("category")
+    .eq("userId", userId)
+    .eq("status", "approved")
+    .gte("date", startDate)
+    .lte("date", endDate);
+
   const allRecords = records || [];
-  const izin = allRecords.filter((r) => r.status === "izin").length;
-  const alpha = allRecords.filter((r) => r.status === "alpha").length;
+  const allObstacles = obstacles || [];
+  const totalHadir = allRecords.filter((r) => r.status === "hadir").length;
+  const totalSakit = allObstacles.filter((o) => o.category === "sakit").length;
+  const totalIzin = allObstacles.filter((o) => o.category === "izin").length;
+  const totalCuti = allObstacles.filter((o) => o.category === "cuti").length;
+  const totalAlpha = allRecords.filter((r) => r.status === "alpha").length;
 
   const dailyChart: { day: number; hadir: number }[] = [];
   for (let d = 1; d <= totalDays; d++) {
@@ -179,10 +191,11 @@ export const GET = withErrorHandling(async (req: NextRequest) => {
     month,
     year,
     totalTeachers: 1,
-    todayHadir: allRecords.find((r) => new Date(r.date).getDate() === now.getDate() && r.status === "hadir") ? 1 : 0,
-    todayIzin: izin,
-    todaySakit: 0,
-    tidakHadirHari: alpha,
+    todayHadir: totalHadir,
+    todaySakit: totalSakit,
+    todayIzin: totalIzin,
+    tidakHadirHari: totalAlpha,
+    totalCuti,
     dailyChart,
     weeks,
   });

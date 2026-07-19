@@ -90,10 +90,6 @@ function AdminView() {
         <div className="relative">
           <div className="mt-4 flex items-end justify-between gap-4">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.12em] text-white/90 ring-1 ring-white/15">
-                <span className="h-2 w-2 rounded-full bg-[#ffff00]" />
-                Admin
-              </div>
               <h1 className="mt-3 font-display text-3xl font-bold leading-none tracking-tight">
                 Halangan Kehadiran
               </h1>

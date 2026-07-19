@@ -27,10 +27,10 @@ export function BottomNav() {
             <Link
               key={item.href}
               href={item.href}
-              className={`min-h-[44px] rounded-2xl flex flex-col items-center justify-center gap-0.5 ${
+              className={`rounded-2xl flex flex-col items-center justify-center py-2.5 gap-0.5 ${
                 isActive
                   ? "bg-[#1b8659] text-[#ffff00]"
-                  : "text-slate-400 transition hover:text-[#1b8659]"
+                  : "min-h-[44px] text-slate-400 transition hover:text-[#1b8659]"
               }`}
             >
               <Icon className="text-lg" />

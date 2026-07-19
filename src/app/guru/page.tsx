@@ -72,11 +72,7 @@ export default function GuruListPage() {
               <ArrowLeft className="text-xl text-white" />
             </Link>
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-white/90 ring-1 ring-white/15">
-                <span className="h-2 w-2 rounded-full bg-[#ffff00]" />
-                Manajemen Guru
-              </div>
-              <h1 className="mt-2 font-display text-2xl font-bold tracking-tight">
+              <h1 className="font-display text-2xl font-bold tracking-tight">
                 Daftar Guru
               </h1>
               <p className="mt-1 text-sm text-white/70">

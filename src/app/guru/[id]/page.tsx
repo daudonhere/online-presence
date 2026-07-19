@@ -134,18 +134,7 @@ export default function GuruDetailPage() {
             >
               <ArrowLeft className="text-xl text-white" />
             </button>
-            <div className="flex-1">
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-white/90 ring-1 ring-white/15">
-                <span className="h-2 w-2 rounded-full bg-[#ffff00]" />
-                Detail Guru
-              </div>
-            </div>
-            <button
-              onClick={() => setShowDelete(true)}
-              className="min-h-[44px] min-w-[44px] rounded-2xl bg-red-500/20 flex items-center justify-center ring-1 ring-red-400/30 transition hover:bg-red-500/30"
-            >
-              <Trash2 className="text-lg text-red-300" />
-            </button>
+            <div className="flex-1" />
           </div>
 
           <div className="relative mt-4 flex items-center gap-4">
@@ -174,12 +163,20 @@ export default function GuruDetailPage() {
           <div className="flex items-center justify-between">
             <h2 className="font-display text-xl font-bold tracking-tight text-slate-950">Data Diri</h2>
             {!editing && (
-              <button
-                onClick={() => { setEditing(true); setMsg(null); }}
-                className="rounded-xl bg-[#1b8659] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#0c6b46]"
-              >
-                Edit
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => { setEditing(true); setMsg(null); }}
+                  className="rounded-xl bg-[#1b8659] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#0c6b46]"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => setShowDelete(true)}
+                  className="rounded-xl bg-red-50 p-2 text-red-500 transition hover:bg-red-100"
+                >
+                  <Trash2 className="text-lg" />
+                </button>
+              </div>
             )}
           </div>
 

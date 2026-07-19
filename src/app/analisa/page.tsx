@@ -24,6 +24,7 @@ interface AnalysisData {
   todayIzin: number;
   todaySakit: number;
   tidakHadirHari: number;
+  totalCuti?: number;
   dailyChart: { day: number; hadir: number }[];
   weeks: {
     week: string;
@@ -32,10 +33,7 @@ interface AnalysisData {
   }[];
 }
 
-const MONTH_NAMES = [
-  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-  "Juli", "Agustus", "September", "Oktober", "November", "Desember",
-];
+
 
 export default function AnalisaPage() {
   const { data: session } = useSession();
@@ -71,7 +69,6 @@ export default function AnalisaPage() {
     );
   }
 
-  const monthName = MONTH_NAMES[data.month - 1];
   const barChart = data.dailyChart;
   const lastDay = barChart.length;
   const maxHadir = Math.max(...barChart.map((d) => d.hadir), 1);
@@ -85,11 +82,7 @@ export default function AnalisaPage() {
 
           <div className="relative flex items-start justify-between gap-4">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-white/90 ring-1 ring-white/15">
-                <span className="h-2 w-2 rounded-full bg-[#ffff00]" />
-                {monthName} {data.year}
-              </div>
-              <h1 className="mt-4 font-display text-3xl font-bold tracking-tight">
+              <h1 className="font-display text-3xl font-bold tracking-tight">
                 Analisa Kehadiran
               </h1>
               <p className="mt-2 text-sm leading-relaxed text-white/80">
@@ -105,7 +98,7 @@ export default function AnalisaPage() {
             <div className="flex items-end justify-between gap-4">
               <div>
                 <p className="text-xs font-medium text-white/70">
-                  Guru Hadir Hari Ini
+                  {isAdmin ? "Guru Hadir Hari Ini" : "Total Hadir"}
                 </p>
                 <div className="mt-1 flex items-end gap-2">
                   <span className="font-display text-5xl font-bold leading-none tracking-tight">
@@ -133,7 +126,7 @@ export default function AnalisaPage() {
             <p className="mt-3 font-display text-3xl font-bold tracking-tight text-red-400">
               {data.todaySakit}
             </p>
-            <p className="text-xs font-semibold text-slate-500">Sakit Hari Ini</p>
+            <p className="text-xs font-semibold text-slate-500">{isAdmin ? "Sakit Hari Ini" : "Sakit"}</p>
           </article>
           <article className="rounded-[24px] bg-white p-4 text-center shadow-card ring-1 ring-slate-100">
             <div className="mx-auto h-11 w-11 rounded-2xl bg-yellow-50 flex items-center justify-center">
@@ -142,7 +135,7 @@ export default function AnalisaPage() {
             <p className="mt-3 font-display text-3xl font-bold tracking-tight text-amber-500">
               {data.todayIzin}
             </p>
-            <p className="text-xs font-semibold text-slate-500">Izin Hari Ini</p>
+            <p className="text-xs font-semibold text-slate-500">{isAdmin ? "Izin Hari Ini" : "Izin"}</p>
           </article>
           <article className="rounded-[24px] bg-white p-4 text-center shadow-card ring-1 ring-slate-100">
             <div className="mx-auto h-11 w-11 rounded-2xl bg-red-50 flex items-center justify-center">
@@ -151,7 +144,7 @@ export default function AnalisaPage() {
             <p className="mt-3 font-display text-3xl font-bold tracking-tight text-red-400">
               {data.tidakHadirHari}
             </p>
-            <p className="text-xs font-semibold text-slate-500">Tidak Hadir</p>
+            <p className="text-xs font-semibold text-slate-500">{isAdmin ? "Tidak Hadir" : "Alpha"}</p>
           </article>
         </div>
 
@@ -162,7 +155,7 @@ export default function AnalisaPage() {
                 Grafik Harian
               </h2>
               <p className="mt-1 text-sm text-slate-500">
-                Jumlah guru hadir per hari
+                {isAdmin ? "Jumlah guru hadir per hari" : "Kehadiran Anda per hari"}
               </p>
             </div>
           </div>
@@ -217,6 +210,12 @@ export default function AnalisaPage() {
               <span className="h-3 w-3 rounded-full bg-[#1b8659]" />
               Jumlah Hadir
             </div>
+            {!isAdmin && (
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                <span className="h-3 w-3 rounded-full bg-slate-300" />
+                Tidak Hadir
+              </div>
+            )}
           </div>
         </section>
 
@@ -227,7 +226,7 @@ export default function AnalisaPage() {
                 Rincian Mingguan
               </h2>
               <p className="mt-1 text-sm text-slate-500">
-                Total guru hadir setiap hari
+                {isAdmin ? "Total guru hadir setiap hari" : "Kehadiran Anda setiap hari"}
               </p>
             </div>
             <CalendarRange className="text-2xl text-[#1b8659]" />
