@@ -251,7 +251,7 @@ export default function ScanPage() {
                       QR Terdeteksi!
                     </p>
                     <p className="text-xs text-white/60">
-                      Menunggu konfirmasi absensi...
+                      Tekan tombol di bawah untuk mengirim absensi
                     </p>
                   </div>
                 </div>
