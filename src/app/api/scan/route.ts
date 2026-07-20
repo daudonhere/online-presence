@@ -72,9 +72,10 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
     const adminLoc = parseDecimal(locationStr);
     if (adminLoc) {
       const dist = haversine(latitude, longitude, adminLoc.lat, adminLoc.lng);
+      const distLabel = dist < 1000 ? `${dist.toFixed(0)} meter` : `${(dist / 1000).toFixed(1)} km`;
       if (dist > 10) {
         return apiError(
-          `Anda berada ${(dist / 1000).toFixed(1)} km dari lokasi sekolah. Harus berada dalam radius 10 meter.`
+          `Anda berada ${distLabel} dari lokasi sekolah. Harus berada dalam radius 10 meter.`
         );
       }
     }
