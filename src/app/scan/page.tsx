@@ -14,7 +14,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Html5Qrcode } from "html5-qrcode";
 
-type ScanState = "idle" | "scanning" | "success" | "error" | "no-permission";
+type ScanState = "idle" | "scanning" | "detecting" | "submitting" | "success" | "error" | "no-permission" | "geo-error";
 
 export default function ScanPage() {
   const [scanState, setScanState] = useState<ScanState>("idle");
@@ -23,6 +23,7 @@ export default function ScanPage() {
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
+  const submittedRef = useRef(false);
 
   const submitMutation = useMutation({
     mutationFn: async ({ qrData, latitude, longitude }: { qrData: string; latitude: number; longitude: number }) => {
@@ -36,10 +37,15 @@ export default function ScanPage() {
       return data;
     },
     onSuccess: () => {
+      setScanState("success");
       try {
         const audio = new Audio("/icons/beep.mp3");
         audio.play().catch(() => {});
       } catch {}
+    },
+    onError: (err: Error) => {
+      setGeoError(err.message);
+      setScanState("error");
     },
   });
 
@@ -53,6 +59,48 @@ export default function ScanPage() {
       }
     }
   }, []);
+
+  const handleScan = useCallback(async (qrData: string) => {
+    if (submittedRef.current) return;
+    submittedRef.current = true;
+    await stopScanner();
+    setScannedResult(qrData);
+    setScanState("detecting");
+    setGeoError("");
+
+    if (!navigator.geolocation) {
+      setGeoError("Perangkat tidak mendukung GPS");
+      setScanState("geo-error");
+      return;
+    }
+
+    setScanState("submitting");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        submitMutation.mutate({
+          qrData,
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+        });
+      },
+      () => {
+        setGeoError("Gagal mendapatkan lokasi. Aktifkan GPS lalu coba lagi.");
+        setScanState("geo-error");
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  }, [stopScanner, submitMutation]);
+
+  const handleRetry = () => {
+    submittedRef.current = false;
+    setScannedResult("");
+    setGeoError("");
+    setScanState("idle");
+    setTimeout(() => {
+      startedRef.current = false;
+      startScanner();
+    }, 300);
+  };
 
   const startScanner = useCallback(async () => {
     if (!containerRef.current || startedRef.current) return;
@@ -78,9 +126,7 @@ export default function ScanPage() {
           disableFlip: false,
         },
         (decodedText) => {
-          setScannedResult(decodedText);
-          setScanState("success");
-          stopScanner();
+          handleScan(decodedText);
         },
         () => {
           // QR not found — keep scanning
@@ -96,7 +142,7 @@ export default function ScanPage() {
         setScanState("error");
       }
     }
-  }, [stopScanner]);
+  }, [handleScan]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -108,30 +154,6 @@ export default function ScanPage() {
       stopScanner();
     };
   }, [startScanner, stopScanner]);
-
-  const handleSubmit = () => {
-    if (!scannedResult || submitMutation.isPending) return;
-    setGeoError("");
-
-    if (!navigator.geolocation) {
-      setGeoError("Perangkat tidak mendukung GPS");
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        submitMutation.mutate({
-          qrData: scannedResult,
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-        });
-      },
-      () => {
-        setGeoError("Gagal mendapatkan lokasi. Aktifkan GPS lalu coba lagi.");
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
-  };
 
   return (
     <DashboardLayout>
@@ -163,13 +185,11 @@ export default function ScanPage() {
 
           <div className="relative mt-4 flex-1 rounded-[28px] bg-slate-950/40 p-3 ring-1 ring-white/15 shadow-card flex items-center justify-center">
             <div className="relative w-full max-w-[286px] aspect-square overflow-hidden rounded-[22px] bg-gradient-to-br from-slate-900 via-[#0b3f2d] to-[#003d7a]">
-              {/* Camera feed mounts here */}
               <div
                 ref={containerRef}
                 className="absolute inset-0 flex items-center justify-center [&>div]:w-full [&>div]:h-full [&_video]:!w-full [&_video]:!h-full [&_video]:!object-cover"
               />
 
-              {/* Corner borders overlay */}
               <div className="absolute inset-0 pointer-events-none z-10">
                 <div className="absolute left-0 top-0 h-12 w-12 rounded-tl-3xl border-l-4 border-t-4 border-[#ffff00]" />
                 <div className="absolute right-0 top-0 h-12 w-12 rounded-tr-3xl border-r-4 border-t-4 border-[#ffff00]" />
@@ -177,12 +197,10 @@ export default function ScanPage() {
                 <div className="absolute bottom-0 right-0 h-12 w-12 rounded-br-3xl border-b-4 border-r-4 border-[#ffff00]" />
               </div>
 
-              {/* Scan line animation — only while scanning */}
               {scanState === "scanning" && (
                 <div className="absolute inset-x-0 top-0 h-0.5 bg-[#ffff00] shadow-[0_0_24px_rgba(255,255,0,0.95)] animate-[scan_2.2s_ease-in-out_infinite] z-20" />
               )}
 
-              {/* Status overlays */}
               {scanState === "idle" && (
                 <div className="absolute inset-0 flex items-center justify-center z-20">
                   <div className="flex flex-col items-center gap-3">
@@ -205,11 +223,7 @@ export default function ScanPage() {
                       Izinkan akses kamera di pengaturan browser Anda
                     </p>
                     <button
-                      onClick={() => {
-                        startedRef.current = false;
-                        setScanState("idle");
-                        setTimeout(startScanner, 300);
-                      }}
+                      onClick={handleRetry}
                       className="mt-2 flex items-center gap-2 rounded-xl bg-white/15 px-4 py-2 text-xs font-bold text-white ring-1 ring-white/20 transition hover:bg-white/25"
                     >
                       <RefreshCw className="h-3.5 w-3.5" />
@@ -219,24 +233,31 @@ export default function ScanPage() {
                 </div>
               )}
 
-              {scanState === "error" && (
+              {(scanState === "error" || scanState === "geo-error") && (
                 <div className="absolute inset-0 flex items-center justify-center z-20 bg-slate-950/60">
                   <div className="flex flex-col items-center gap-3 px-6 text-center">
                     <CameraOff className="h-12 w-12 text-red-400" />
                     <p className="text-sm text-white/80 font-medium">
-                      Gagal memulai kamera
+                      {geoError || "Gagal memulai kamera"}
                     </p>
                     <button
-                      onClick={() => {
-                        startedRef.current = false;
-                        setScanState("idle");
-                        setTimeout(startScanner, 300);
-                      }}
+                      onClick={handleRetry}
                       className="mt-2 flex items-center gap-2 rounded-xl bg-white/15 px-4 py-2 text-xs font-bold text-white ring-1 ring-white/20 transition hover:bg-white/25"
                     >
                       <RefreshCw className="h-3.5 w-3.5" />
                       Coba Lagi
                     </button>
+                  </div>
+                </div>
+              )}
+
+              {(scanState === "detecting" || scanState === "submitting") && (
+                <div className="absolute inset-0 flex items-center justify-center z-20 bg-slate-950/70">
+                  <div className="flex flex-col items-center gap-3 px-6 text-center">
+                    <Loader2 className="h-12 w-12 text-[#ffff00] animate-spin" />
+                    <p className="text-sm text-white font-bold">
+                      {scanState === "detecting" ? "QR Terdeteksi!" : "Mengirim absensi..."}
+                    </p>
                   </div>
                 </div>
               )}
@@ -248,10 +269,7 @@ export default function ScanPage() {
                       <CheckCircle2 className="h-10 w-10 text-white" />
                     </div>
                     <p className="text-sm text-white font-bold">
-                      QR Terdeteksi!
-                    </p>
-                    <p className="text-xs text-white/60">
-                      Tekan tombol di bawah untuk mengirim absensi
+                      Absensi Berhasil!
                     </p>
                   </div>
                 </div>
@@ -260,32 +278,24 @@ export default function ScanPage() {
           </div>
 
           <div className="relative mt-4 space-y-3">
-            {submitMutation.isSuccess ? (
+            {scanState === "success" ? (
               <div className="min-h-[58px] w-full rounded-2xl bg-[#1b8659] px-5 py-4 text-center text-base font-black text-white flex items-center justify-center gap-2 shadow-card">
                 <CheckCircle2 className="text-2xl" />
                 Absensi berhasil!
               </div>
+            ) : scanState === "geo-error" ? (
+              <button
+                onClick={handleRetry}
+                className="min-h-[58px] w-full rounded-2xl bg-[#ffff00] px-5 py-4 text-center text-base font-black text-[#003d7a] transition hover:scale-[0.98] flex items-center justify-center gap-2 shadow-card"
+              >
+                <RefreshCw className="text-2xl" />
+                Coba Lagi
+              </button>
             ) : (
-              <>
-                <button
-                  disabled={scanState !== "success" || submitMutation.isPending}
-                  onClick={handleSubmit}
-                  className="min-h-[58px] w-full rounded-2xl bg-[#ffff00] px-5 py-4 text-center text-base font-black text-[#003d7a] transition hover:scale-[0.98] flex items-center justify-center gap-2 shadow-card disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                >
-                  {submitMutation.isPending ? (
-                    <Loader2 className="text-2xl animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="text-2xl" />
-                  )}
-                  {submitMutation.isPending ? "Mengirim..." : "Kirim Absensi"}
-                </button>
-                {submitMutation.isError && (
-                  <p className="text-sm text-red-500 font-medium text-center">{submitMutation.error.message}</p>
-                )}
-                {geoError && !submitMutation.isError && (
-                  <p className="text-sm text-red-500 font-medium text-center">{geoError}</p>
-                )}
-              </>
+              <div className="min-h-[58px] w-full rounded-2xl bg-white/20 px-5 py-4 text-center text-sm font-bold text-white/70 flex items-center justify-center gap-2">
+                <Loader2 className="text-lg animate-spin" />
+                Arahkan kamera ke QR Code
+              </div>
             )}
           </div>
         </div>

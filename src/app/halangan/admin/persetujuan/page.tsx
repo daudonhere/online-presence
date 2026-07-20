@@ -12,10 +12,11 @@ import {
   ChevronLeft,
   CalendarDays,
   ClipboardCheck,
+  AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
-import { useState, useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useMemo, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DashboardLayout } from "@/components/layout";
 
 interface ObstacleRecord {
@@ -42,6 +43,8 @@ interface AttendanceRecord {
 }
 
 type TabType = "halangan" | "manual";
+
+type Toast = { id: number; type: "success" | "error"; message: string };
 
 const CATEGORY_BADGE: Record<string, { label: string; bg: string; color: string }> = {
   sakit: { label: "Sakit", bg: "bg-emerald-50", color: "text-[#1b8659]" },
@@ -93,7 +96,17 @@ export default function PersetujuanPage() {
   const [year, setYear] = useState(now.getFullYear());
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState<TabType>("halangan");
+  const [selectedObstacles, setSelectedObstacles] = useState<Set<number>>(new Set());
+  const [selectedAttendances, setSelectedAttendances] = useState<Set<number>>(new Set());
+  const [processingIds, setProcessingIds] = useState<Set<number>>(new Set());
+  const [toasts, setToasts] = useState<Toast[]>([]);
   const queryClient = useQueryClient();
+
+  const showToast = useCallback((type: "success" | "error", message: string) => {
+    const id = Date.now();
+    setToasts((prev) => [...prev, { id, type, message }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3000);
+  }, []);
 
   const { data: obstacles, isLoading: loadingObstacles } = useQuery<ObstacleRecord[]>({
     queryKey: ["admin-obstacles", month, year],
@@ -113,37 +126,81 @@ export default function PersetujuanPage() {
     },
   });
 
-  const processObstacleMutation = useMutation({
-    mutationFn: async ({ id, action }: { id: number; action: "approved" | "rejected" }) => {
-      const res = await fetch(`/api/admin/obstacles/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Gagal memproses");
-      return data;
-    },
-    onSuccess: () => {
+  async function processObstacle(ids: number[], action: "approved" | "rejected") {
+    const idSet = new Set(ids);
+    setProcessingIds((prev) => new Set([...prev, ...ids]));
+    try {
+      const results = await Promise.all(
+        ids.map(async (id) => {
+          const res = await fetch(`/api/admin/obstacles/${id}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action }),
+          });
+          if (!res.ok) {
+            const data = await res.json();
+            throw new Error(data.error || "Gagal memproses");
+          }
+          return res.json();
+        })
+      );
       queryClient.invalidateQueries({ queryKey: ["admin-obstacles"] });
-    },
-  });
+      setSelectedObstacles((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.delete(id));
+        return next;
+      });
+      const label = action === "approved" ? "Disetujui" : "Ditolak";
+      if (ids.length === 1) {
+        showToast("success", `${label} 1 pengajuan`);
+      } else {
+        showToast("success", `${label} ${ids.length} pengajuan`);
+      }
+      return results;
+    } catch (err) {
+      showToast("error", err instanceof Error ? err.message : "Gagal memproses");
+    } finally {
+      setProcessingIds((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.delete(id));
+        return next;
+      });
+    }
+  }
 
-  const processAttendanceMutation = useMutation({
-    mutationFn: async ({ id, action }: { id: number; action: "approved" | "rejected" }) => {
-      const res = await fetch(`/api/admin/attendance`, {
+  async function processAttendance(ids: number[], action: "approved" | "rejected") {
+    setProcessingIds((prev) => new Set([...prev, ...ids]));
+    try {
+      const res = await fetch("/api/admin/attendance", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, action }),
+        body: JSON.stringify({ ids, action }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Gagal memproses");
-      return data;
-    },
-    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-pending-attendance"] });
-    },
-  });
+      setSelectedAttendances((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.delete(id));
+        return next;
+      });
+      const label = action === "approved" ? "Disetujui" : "Ditolak";
+      if (ids.length === 1) {
+        showToast("success", `${label} 1 absensi`);
+      } else {
+        showToast("success", `${label} ${ids.length} absensi`);
+      }
+      return data;
+    } catch (err) {
+      showToast("error", err instanceof Error ? err.message : "Gagal memproses");
+    } finally {
+      setProcessingIds((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.delete(id));
+        return next;
+      });
+    }
+  }
 
   const pendingObstacles = useMemo(() => (obstacles ?? []).filter((i) => i.status === "pending"), [obstacles]);
   const pendingAttendancesList = useMemo(() => pendingAttendances ?? [], [pendingAttendances]);
@@ -168,9 +225,71 @@ export default function PersetujuanPage() {
 
   const isLoading = tab === "halangan" ? loadingObstacles : loadingAttendances;
 
+  const allObstaclesSelected = filteredObstacles.length > 0 && filteredObstacles.every((i) => selectedObstacles.has(i.id));
+  const allAttendancesSelected = filteredAttendances.length > 0 && filteredAttendances.every((i) => selectedAttendances.has(i.id));
+
+  function toggleAllObstacles() {
+    if (allObstaclesSelected) {
+      setSelectedObstacles(new Set());
+    } else {
+      setSelectedObstacles(new Set(filteredObstacles.map((i) => i.id)));
+    }
+  }
+
+  function toggleObstacle(id: number) {
+    setSelectedObstacles((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAllAttendances() {
+    if (allAttendancesSelected) {
+      setSelectedAttendances(new Set());
+    } else {
+      setSelectedAttendances(new Set(filteredAttendances.map((i) => i.id)));
+    }
+  }
+
+  function toggleAttendance(id: number) {
+    setSelectedAttendances((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const selectedObstacleIds = useMemo(() => Array.from(selectedObstacles), [selectedObstacles]);
+  const selectedAttendanceIds = useMemo(() => Array.from(selectedAttendances), [selectedAttendances]);
+
   return (
     <DashboardLayout>
       <div className="w-full max-w-md">
+        {toasts.length > 0 && (
+          <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 space-y-2 w-full max-w-sm px-4">
+            {toasts.map((t) => (
+              <div
+                key={t.id}
+                className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-bold shadow-lg transition-all ${
+                  t.type === "success"
+                    ? "bg-[#1b8659] text-white"
+                    : "bg-red-600 text-white"
+                }`}
+              >
+                {t.type === "success" ? (
+                  <CheckCircle2 className="h-5 w-5 shrink-0" />
+                ) : (
+                  <AlertCircle className="h-5 w-5 shrink-0" />
+                )}
+                {t.message}
+              </div>
+            ))}
+          </div>
+        )}
+
         <section className="relative overflow-hidden rounded-[34px] bg-gradient-to-br from-[#0c6b46] via-[#1b8659] to-[#075d3d] p-5 text-white shadow-soft">
           <div className="absolute -right-12 -top-10 h-36 w-36 rounded-bl-[58px] bg-[#ffff00] z-0" />
           <div className="absolute -left-12 -bottom-14 h-36 w-36 rounded-full bg-[#003d7a]/25" />
@@ -257,7 +376,7 @@ export default function PersetujuanPage() {
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => setTab("halangan")}
+              onClick={() => { setTab("halangan"); setSelectedAttendances(new Set()); }}
               className={`flex-1 rounded-xl px-3 py-2.5 text-xs font-bold transition ${
                 tab === "halangan"
                   ? "bg-[#1b8659] text-[#ffff00] shadow-card"
@@ -271,7 +390,7 @@ export default function PersetujuanPage() {
             </button>
             <button
               type="button"
-              onClick={() => setTab("manual")}
+              onClick={() => { setTab("manual"); setSelectedObstacles(new Set()); }}
               className={`flex-1 rounded-xl px-3 py-2.5 text-xs font-bold transition ${
                 tab === "manual"
                   ? "bg-[#1b8659] text-[#ffff00] shadow-card"
@@ -322,61 +441,116 @@ export default function PersetujuanPage() {
             </section>
           ) : (
             <section className="mt-4 rounded-[28px] bg-white p-4 shadow-card ring-1 ring-slate-100">
-              <p className="text-xs font-bold text-slate-400">
-                {filteredObstacles.length} pengajuan
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold text-slate-400">
+                  {selectedObstacleIds.length > 0
+                    ? `${selectedObstacleIds.length} dipilih`
+                    : `${filteredObstacles.length} pengajuan`}
+                </p>
+                <label className="flex items-center gap-2 text-xs font-bold text-slate-500 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={allObstaclesSelected}
+                    onChange={toggleAllObstacles}
+                    className="h-4 w-4 rounded border-slate-300 text-[#1b8659] focus:ring-[#1b8659]"
+                  />
+                  Pilih semua
+                </label>
+              </div>
+
+              {selectedObstacleIds.length > 0 && (
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() => processObstacle(selectedObstacleIds, "approved")}
+                    disabled={selectedObstacleIds.some((id) => processingIds.has(id))}
+                    className="flex-1 min-h-[40px] rounded-xl bg-[#1b8659] px-3 py-2 text-xs font-bold text-[#ffff00] transition hover:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Setujui ({selectedObstacleIds.length})
+                  </button>
+                  <button
+                    onClick={() => processObstacle(selectedObstacleIds, "rejected")}
+                    disabled={selectedObstacleIds.some((id) => processingIds.has(id))}
+                    className="flex-1 min-h-[40px] rounded-xl border-2 border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-600 transition hover:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  >
+                    <XCircle className="h-3.5 w-3.5" />
+                    Tolak ({selectedObstacleIds.length})
+                  </button>
+                </div>
+              )}
+
               <div className="mt-3 space-y-3">
                 {filteredObstacles.map((item) => {
                   const cat = CATEGORY_BADGE[item.category] ?? CATEGORY_BADGE.sakit;
+                  const isProcessing = processingIds.has(item.id);
                   return (
-                    <div key={item.id} className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#1b8659]">
-                            <User className="h-5 w-5 text-[#ffff00]" />
+                    <div key={item.id} className={`rounded-2xl p-4 ring-1 transition ${selectedObstacles.has(item.id) ? "bg-[#1b8659]/5 ring-[#1b8659]/30" : "bg-slate-50 ring-slate-100"}`}>
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedObstacles.has(item.id)}
+                          onChange={() => toggleObstacle(item.id)}
+                          disabled={isProcessing}
+                          className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 text-[#1b8659] focus:ring-[#1b8659]"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#1b8659]">
+                                <User className="h-5 w-5 text-[#ffff00]" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-bold text-slate-950 truncate">
+                                  {item.User.name}
+                                </p>
+                                <p className="text-xs text-slate-500">
+                                  {formatDay(item.date)} · {item.User.phone}
+                                </p>
+                              </div>
+                            </div>
+                            <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ${cat.bg} ${cat.color}`}>
+                              {cat.label}
+                            </span>
                           </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-bold text-slate-950 truncate">
-                              {item.User.name}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              {formatDay(item.date)} · {item.User.phone}
-                            </p>
+                          <p className="mt-2 text-xs leading-relaxed text-slate-600 line-clamp-2">
+                            {item.reason}
+                          </p>
+                          {item.fileUrl && (
+                            <button
+                              onClick={() => downloadFile(item.fileUrl!)}
+                              className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[#1b8659]/10 px-3 py-1.5 text-[11px] font-bold text-[#1b8659] transition hover:bg-[#1b8659]/20"
+                            >
+                              <FileText className="h-3.5 w-3.5" />
+                              Unduh Lampiran
+                            </button>
+                          )}
+                          <div className="mt-3 flex gap-2">
+                            <button
+                              onClick={() => processObstacle([item.id], "approved")}
+                              disabled={isProcessing}
+                              className="flex-1 min-h-[40px] rounded-xl bg-[#1b8659] px-3 py-2 text-xs font-bold text-[#ffff00] transition hover:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1.5"
+                            >
+                              {isProcessing ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                              )}
+                              Setujui
+                            </button>
+                            <button
+                              onClick={() => processObstacle([item.id], "rejected")}
+                              disabled={isProcessing}
+                              className="flex-1 min-h-[40px] rounded-xl border-2 border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-600 transition hover:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1.5"
+                            >
+                              {isProcessing ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                              ) : (
+                                <XCircle className="h-3.5 w-3.5" />
+                              )}
+                              Tolak
+                            </button>
                           </div>
                         </div>
-                        <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold ${cat.bg} ${cat.color}`}>
-                          {cat.label}
-                        </span>
-                      </div>
-                      <p className="mt-2 text-xs leading-relaxed text-slate-600 line-clamp-2">
-                        {item.reason}
-                      </p>
-                      {item.fileUrl && (
-                        <button
-                          onClick={() => downloadFile(item.fileUrl!)}
-                          className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[#1b8659]/10 px-3 py-1.5 text-[11px] font-bold text-[#1b8659] transition hover:bg-[#1b8659]/20"
-                        >
-                          <FileText className="h-3.5 w-3.5" />
-                          Unduh Lampiran
-                        </button>
-                      )}
-                      <div className="mt-3 flex gap-2">
-                        <button
-                          onClick={() => processObstacleMutation.mutate({ id: item.id, action: "approved" })}
-                          disabled={processObstacleMutation.isPending}
-                          className="flex-1 min-h-[40px] rounded-xl bg-[#1b8659] px-3 py-2 text-xs font-bold text-[#ffff00] transition hover:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1.5"
-                        >
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                          Setujui
-                        </button>
-                        <button
-                          onClick={() => processObstacleMutation.mutate({ id: item.id, action: "rejected" })}
-                          disabled={processObstacleMutation.isPending}
-                          className="flex-1 min-h-[40px] rounded-xl border-2 border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-600 transition hover:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1.5"
-                        >
-                          <XCircle className="h-3.5 w-3.5" />
-                          Tolak
-                        </button>
                       </div>
                     </div>
                   );
@@ -400,55 +574,112 @@ export default function PersetujuanPage() {
           </section>
         ) : (
           <section className="mt-4 rounded-[28px] bg-white p-4 shadow-card ring-1 ring-slate-100">
-            <p className="text-xs font-bold text-slate-400">
-              {filteredAttendances.length} pengajuan
-            </p>
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-bold text-slate-400">
+                {selectedAttendanceIds.length > 0
+                  ? `${selectedAttendanceIds.length} dipilih`
+                  : `${filteredAttendances.length} pengajuan`}
+              </p>
+              <label className="flex items-center gap-2 text-xs font-bold text-slate-500 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={allAttendancesSelected}
+                  onChange={toggleAllAttendances}
+                  className="h-4 w-4 rounded border-slate-300 text-[#1b8659] focus:ring-[#1b8659]"
+                />
+                Pilih semua
+              </label>
+            </div>
+
+            {selectedAttendanceIds.length > 0 && (
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={() => processAttendance(selectedAttendanceIds, "approved")}
+                  disabled={selectedAttendanceIds.some((id) => processingIds.has(id))}
+                  className="flex-1 min-h-[40px] rounded-xl bg-[#1b8659] px-3 py-2 text-xs font-bold text-[#ffff00] transition hover:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Setujui ({selectedAttendanceIds.length})
+                </button>
+                <button
+                  onClick={() => processAttendance(selectedAttendanceIds, "rejected")}
+                  disabled={selectedAttendanceIds.some((id) => processingIds.has(id))}
+                  className="flex-1 min-h-[40px] rounded-xl border-2 border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-600 transition hover:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  <XCircle className="h-3.5 w-3.5" />
+                  Tolak ({selectedAttendanceIds.length})
+                </button>
+              </div>
+            )}
+
             <div className="mt-3 space-y-3">
-              {filteredAttendances.map((item) => (
-                <div key={item.id} className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#003d7a]">
-                        <User className="h-5 w-5 text-[#ffff00]" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-bold text-slate-950 truncate">
-                          {item.User.name}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {formatDay(item.date)} · {item.checkInTime} · {item.User.phone}
-                        </p>
+              {filteredAttendances.map((item) => {
+                const isProcessing = processingIds.has(item.id);
+                return (
+                  <div key={item.id} className={`rounded-2xl p-4 ring-1 transition ${selectedAttendances.has(item.id) ? "bg-[#1b8659]/5 ring-[#1b8659]/30" : "bg-slate-50 ring-slate-100"}`}>
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedAttendances.has(item.id)}
+                        onChange={() => toggleAttendance(item.id)}
+                        disabled={isProcessing}
+                        className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 text-[#1b8659] focus:ring-[#1b8659]"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#003d7a]">
+                              <User className="h-5 w-5 text-[#ffff00]" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-bold text-slate-950 truncate">
+                                {item.User.name}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                {formatDay(item.date)} · {item.checkInTime} · {item.User.phone}
+                              </p>
+                            </div>
+                          </div>
+                          <span className="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-600">
+                            Manual
+                          </span>
+                        </div>
+                        {item.notes && (
+                          <p className="mt-2 text-xs leading-relaxed text-slate-600 line-clamp-2">
+                            {item.notes}
+                          </p>
+                        )}
+                        <div className="mt-3 flex gap-2">
+                          <button
+                            onClick={() => processAttendance([item.id], "approved")}
+                            disabled={isProcessing}
+                            className="flex-1 min-h-[40px] rounded-xl bg-[#1b8659] px-3 py-2 text-xs font-bold text-[#ffff00] transition hover:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1.5"
+                          >
+                            {isProcessing ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                            )}
+                            Setujui
+                          </button>
+                          <button
+                            onClick={() => processAttendance([item.id], "rejected")}
+                            disabled={isProcessing}
+                            className="flex-1 min-h-[40px] rounded-xl border-2 border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-600 transition hover:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1.5"
+                          >
+                            {isProcessing ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <XCircle className="h-3.5 w-3.5" />
+                            )}
+                            Tolak
+                          </button>
+                        </div>
                       </div>
                     </div>
-                    <span className="shrink-0 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-600">
-                      Manual
-                    </span>
                   </div>
-                  {item.notes && (
-                    <p className="mt-2 text-xs leading-relaxed text-slate-600 line-clamp-2">
-                      {item.notes}
-                    </p>
-                  )}
-                  <div className="mt-3 flex gap-2">
-                    <button
-                      onClick={() => processAttendanceMutation.mutate({ id: item.id, action: "approved" })}
-                      disabled={processAttendanceMutation.isPending}
-                      className="flex-1 min-h-[40px] rounded-xl bg-[#1b8659] px-3 py-2 text-xs font-bold text-[#ffff00] transition hover:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1.5"
-                    >
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      Setujui
-                    </button>
-                    <button
-                      onClick={() => processAttendanceMutation.mutate({ id: item.id, action: "rejected" })}
-                      disabled={processAttendanceMutation.isPending}
-                      className="flex-1 min-h-[40px] rounded-xl border-2 border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-600 transition hover:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1.5"
-                    >
-                      <XCircle className="h-3.5 w-3.5" />
-                      Tolak
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </section>
         )}

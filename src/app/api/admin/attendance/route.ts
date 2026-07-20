@@ -39,23 +39,23 @@ export const PATCH = withErrorHandling(async (req: NextRequest) => {
   if (session.user.role !== "admin") return apiError("Forbidden", 403);
 
   const body = await req.json();
-  const { id, action } = body as { id: number; action: "approved" | "rejected" };
+  const { id, ids, action } = body as { id?: number; ids?: number[]; action: "approved" | "rejected" };
 
-  if (!id || !action) return apiError("id dan action wajib diisi", 400);
-  if (!["approved", "rejected"].includes(action)) return apiError("action tidak valid", 400);
+  if (!action || !["approved", "rejected"].includes(action)) return apiError("action tidak valid", 400);
+
+  const targetIds = ids && ids.length > 0 ? ids : id ? [id] : [];
+  if (targetIds.length === 0) return apiError("Sertakan id atau ids", 400);
 
   const status = action === "approved" ? "hadir" : "alpha";
 
   const { data, error } = await getSupabase()
     .from("Attendance")
     .update({ status })
-    .eq("id", id)
+    .in("id", targetIds)
     .eq("status", "pending")
-    .select()
-    .single();
+    .select();
 
   if (error) throw error;
-  if (!data) return apiError("Absensi tidak ditemukan atau sudah diproses", 404);
 
-  return apiSuccess(data);
+  return apiSuccess({ updated: data?.length ?? 0 });
 });
