@@ -127,7 +127,6 @@ export default function PersetujuanPage() {
   });
 
   async function processObstacle(ids: number[], action: "approved" | "rejected") {
-    const idSet = new Set(ids);
     setProcessingIds((prev) => new Set([...prev, ...ids]));
     try {
       const results = await Promise.all(

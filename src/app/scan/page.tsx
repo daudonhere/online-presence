@@ -18,12 +18,12 @@ type ScanState = "idle" | "scanning" | "detecting" | "submitting" | "success" | 
 
 export default function ScanPage() {
   const [scanState, setScanState] = useState<ScanState>("idle");
-  const [scannedResult, setScannedResult] = useState<string>("");
   const [geoError, setGeoError] = useState<string>("");
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
   const submittedRef = useRef(false);
+  const handleScanRef = useRef<(qrData: string) => void>(() => {});
 
   const submitMutation = useMutation({
     mutationFn: async ({ qrData, latitude, longitude }: { qrData: string; latitude: number; longitude: number }) => {
@@ -60,47 +60,37 @@ export default function ScanPage() {
     }
   }, []);
 
-  const handleScan = useCallback(async (qrData: string) => {
-    if (submittedRef.current) return;
-    submittedRef.current = true;
-    await stopScanner();
-    setScannedResult(qrData);
-    setScanState("detecting");
-    setGeoError("");
+  useEffect(() => {
+    handleScanRef.current = async (qrData: string) => {
+      if (submittedRef.current) return;
+      submittedRef.current = true;
+      await stopScanner();
+      setScanState("detecting");
+      setGeoError("");
 
-    if (!navigator.geolocation) {
-      setGeoError("Perangkat tidak mendukung GPS");
-      setScanState("geo-error");
-      return;
-    }
-
-    setScanState("submitting");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        submitMutation.mutate({
-          qrData,
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-        });
-      },
-      () => {
-        setGeoError("Gagal mendapatkan lokasi. Aktifkan GPS lalu coba lagi.");
+      if (!navigator.geolocation) {
+        setGeoError("Perangkat tidak mendukung GPS");
         setScanState("geo-error");
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
-  }, [stopScanner, submitMutation]);
+        return;
+      }
 
-  const handleRetry = () => {
-    submittedRef.current = false;
-    setScannedResult("");
-    setGeoError("");
-    setScanState("idle");
-    setTimeout(() => {
-      startedRef.current = false;
-      startScanner();
-    }, 300);
-  };
+      setScanState("submitting");
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          submitMutation.mutate({
+            qrData,
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+          });
+        },
+        () => {
+          setGeoError("Gagal mendapatkan lokasi. Aktifkan GPS lalu coba lagi.");
+          setScanState("geo-error");
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    };
+  }, [stopScanner, submitMutation]);
 
   const startScanner = useCallback(async () => {
     if (!containerRef.current || startedRef.current) return;
@@ -126,7 +116,7 @@ export default function ScanPage() {
           disableFlip: false,
         },
         (decodedText) => {
-          handleScan(decodedText);
+          handleScanRef.current(decodedText);
         },
         () => {
           // QR not found — keep scanning
@@ -142,7 +132,7 @@ export default function ScanPage() {
         setScanState("error");
       }
     }
-  }, [handleScan]);
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -154,6 +144,14 @@ export default function ScanPage() {
       stopScanner();
     };
   }, [startScanner, stopScanner]);
+
+  const handleRetry = () => {
+    submittedRef.current = false;
+    setGeoError("");
+    setScanState("idle");
+    startedRef.current = false;
+    setTimeout(startScanner, 300);
+  };
 
   return (
     <DashboardLayout>
