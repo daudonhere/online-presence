@@ -145,7 +145,13 @@ export default function ManualPage() {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setTime(getCurrentTime());
+      const now = new Date();
+      setTime(now.toTimeString().slice(0, 5));
+      const todayNow = now.toISOString().split("T")[0];
+      setDate((prev) => {
+        if (prev < todayNow) return todayNow;
+        return prev;
+      });
     }, 30_000);
     return () => clearInterval(interval);
   }, []);

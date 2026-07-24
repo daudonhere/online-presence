@@ -57,5 +57,15 @@ export const PATCH = withErrorHandling(async (req: NextRequest) => {
 
   if (error) throw error;
 
+  if (data && data.length > 0) {
+    const historyInserts = data.map((r: { id: number }) => ({
+      entityType: "attendance",
+      entityId: r.id,
+      action,
+      performedBy: Number(session.user.id),
+    }));
+    await getSupabase().from("ApprovalHistory").insert(historyInserts);
+  }
+
   return apiSuccess({ updated: data?.length ?? 0 });
 });

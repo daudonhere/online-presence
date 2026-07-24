@@ -13,6 +13,8 @@ import {
   CalendarDays,
   ClipboardCheck,
   AlertCircle,
+  History,
+  ChevronDown,
 } from "lucide-react";
 import Link from "next/link";
 import { useState, useMemo, useCallback } from "react";
@@ -100,6 +102,7 @@ export default function PersetujuanPage() {
   const [selectedAttendances, setSelectedAttendances] = useState<Set<number>>(new Set());
   const [processingIds, setProcessingIds] = useState<Set<number>>(new Set());
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
   const queryClient = useQueryClient();
 
   const showToast = useCallback((type: "success" | "error", message: string) => {
@@ -124,6 +127,16 @@ export default function PersetujuanPage() {
       if (!res.ok) throw new Error("Gagal memuat data");
       return res.json();
     },
+  });
+
+  const { data: approvalHistory } = useQuery<{ id: number; entityType: string; entityId: number; action: string; createdAt: string; User: { name: string } }[]>({
+    queryKey: ["admin-approval-history"],
+    queryFn: async () => {
+      const res = await fetch("/api/admin/history");
+      if (!res.ok) throw new Error("Gagal memuat riwayat");
+      return res.json();
+    },
+    enabled: showHistory,
   });
 
   async function processObstacle(ids: number[], action: "approved" | "rejected") {
@@ -682,6 +695,48 @@ export default function PersetujuanPage() {
             </div>
           </section>
         )}
+        {/* History Section */}
+        <section className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <button
+            onClick={() => setShowHistory(!showHistory)}
+            className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition"
+          >
+            <div className="flex items-center gap-3">
+              <History className="w-5 h-5 text-gray-500" />
+              <span className="font-semibold text-gray-800">Riwayat Persetujuan</span>
+            </div>
+            <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${showHistory ? "rotate-180" : ""}`} />
+          </button>
+          {showHistory && (
+            <div className="border-t border-gray-100 px-5 pb-5">
+              {approvalHistory && approvalHistory.length > 0 ? (
+                <ul className="divide-y divide-gray-100 max-h-64 overflow-y-auto">
+                  {approvalHistory.map((h) => (
+                    <li key={h.id} className="py-3 flex items-center gap-3">
+                      {h.action === "approved" ? (
+                        <CheckCircle2 className="w-4 h-4 text-green-600 shrink-0" />
+                      ) : (
+                        <XCircle className="w-4 h-4 text-red-500 shrink-0" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm text-gray-700 truncate">
+                          <span className="font-medium">{h.User?.name}</span>{" "}
+                          {h.action === "approved" ? "menyetujui" : "menolak"}{" "}
+                          {h.entityType === "obstacle" ? "halangan" : "absen manual"} #{h.entityId}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {new Date(h.createdAt).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}
+                        </p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-gray-500 py-4 text-center">Belum ada riwayat</p>
+              )}
+            </div>
+          )}
+        </section>
       </div>
     </DashboardLayout>
   );

@@ -74,6 +74,17 @@ export default function ScanPage() {
         return;
       }
 
+      try {
+        const permission = await navigator.permissions.query({ name: "geolocation" });
+        if (permission.state === "denied") {
+          setGeoError("Izin lokasi ditolak. Aktifkan di Pengaturan Browser > Privasi > Lokasi.");
+          setScanState("geo-error");
+          return;
+        }
+      } catch {
+        // permissions API not supported, proceed with getCurrentPosition
+      }
+
       setScanState("submitting");
       navigator.geolocation.getCurrentPosition(
         (pos) => {
@@ -83,8 +94,16 @@ export default function ScanPage() {
             longitude: pos.coords.longitude,
           });
         },
-        () => {
-          setGeoError("Gagal mendapatkan lokasi. Aktifkan GPS lalu coba lagi.");
+        (err) => {
+          let msg = "Gagal mendapatkan lokasi. Aktifkan GPS lalu coba lagi.";
+          if (err.code === 1) {
+            msg = "Izin lokasi ditolak. Aktifkan akses lokasi di pengaturan perangkat Anda.";
+          } else if (err.code === 2) {
+            msg = "Lokasi tidak tersedia. Pastikan GPS perangkat aktif.";
+          } else if (err.code === 3) {
+            msg = "Permintaan lokasi melewati batas waktu. Pastikan GPS aktif dan coba lagi.";
+          }
+          setGeoError(msg);
           setScanState("geo-error");
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -231,16 +250,39 @@ export default function ScanPage() {
                 </div>
               )}
 
-              {(scanState === "error" || scanState === "geo-error") && (
+              {scanState === "error" && (
                 <div className="absolute inset-0 flex items-center justify-center z-20 bg-slate-950/60">
                   <div className="flex flex-col items-center gap-3 px-6 text-center">
                     <CameraOff className="h-12 w-12 text-red-400" />
                     <p className="text-sm text-white/80 font-medium">
-                      {geoError || "Gagal memulai kamera"}
+                      Gagal memulai kamera
                     </p>
                     <button
                       onClick={handleRetry}
                       className="mt-2 flex items-center gap-2 rounded-xl bg-white/15 px-4 py-2 text-xs font-bold text-white ring-1 ring-white/20 transition hover:bg-white/25"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      Coba Lagi
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {scanState === "geo-error" && (
+                <div className="absolute inset-0 flex items-center justify-center z-20 bg-slate-950/60">
+                  <div className="flex flex-col items-center gap-3 px-6 text-center">
+                    <div className="h-14 w-14 rounded-full bg-red-500/20 flex items-center justify-center">
+                      <CameraOff className="h-8 w-8 text-red-400" />
+                    </div>
+                    <p className="text-sm text-white/90 font-bold leading-snug">
+                      {geoError}
+                    </p>
+                    <p className="text-xs text-white/50 leading-relaxed">
+                      Buka <span className="font-bold text-white/70">Pengaturan Perangkat</span> &gt; <span className="font-bold text-white/70">Privasi</span> &gt; <span className="font-bold text-white/70">Lokasi</span>, lalu aktifkan akses lokasi untuk browser ini.
+                    </p>
+                    <button
+                      onClick={handleRetry}
+                      className="mt-2 flex items-center gap-2 rounded-xl bg-white/15 px-5 py-2.5 text-xs font-bold text-white ring-1 ring-white/20 transition hover:bg-white/25"
                     >
                       <RefreshCw className="h-3.5 w-3.5" />
                       Coba Lagi

@@ -43,11 +43,6 @@ export const POST = withErrorHandling(async (req: NextRequest) => {
   const { date, time, notes } = result.data;
   const userId = Number(session.user.id);
   const dateStr = new Date(date).toISOString().split("T")[0];
-  const todayStr = new Date().toISOString().split("T")[0];
-
-  if (dateStr !== todayStr) {
-    return apiError("Absensi hanya bisa dilakukan untuk hari ini");
-  }
 
   const { data: existing } = await getSupabase()
     .from("Attendance")

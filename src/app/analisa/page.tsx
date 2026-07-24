@@ -144,7 +144,7 @@ export default function AnalisaPage() {
             <p className="mt-3 font-display text-3xl font-bold tracking-tight text-red-400">
               {data.tidakHadirHari}
             </p>
-            <p className="text-xs font-semibold text-slate-500">{isAdmin ? "Tidak Hadir" : "Alpha"}</p>
+            <p className="text-xs font-semibold text-slate-500">Tidak Hadir</p>
           </article>
         </div>
 

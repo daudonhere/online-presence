@@ -40,6 +40,13 @@ export const PATCH = withErrorHandling(
 
     if (updateError) throw updateError;
 
+    await getSupabase().from("ApprovalHistory").insert({
+      entityType: "obstacle",
+      entityId: obstacleId,
+      action,
+      performedBy: Number(session.user.id),
+    });
+
     const categoryLabel: Record<string, string> = {
       sakit: "Sakit",
       izin: "Izin",

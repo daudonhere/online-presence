@@ -142,6 +142,20 @@ CREATE TABLE IF NOT EXISTS "Report" (
   "createdAt" TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+-- 9. ApprovalHistory
+CREATE TABLE IF NOT EXISTS "ApprovalHistory" (
+  "id"          SERIAL PRIMARY KEY,
+  "entityType"  TEXT NOT NULL,
+  "entityId"    INTEGER NOT NULL,
+  "action"      TEXT NOT NULL,
+  "performedBy" INTEGER NOT NULL REFERENCES "User"("id") ON DELETE SET NULL,
+  "notes"       TEXT,
+  "createdAt"   TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS "ApprovalHistory_entityType_entityId_idx" ON "ApprovalHistory"("entityType", "entityId");
+CREATE INDEX IF NOT EXISTS "ApprovalHistory_performedBy_idx" ON "ApprovalHistory"("performedBy");
+
 -- ============================================================
 -- Seed: admin account
 -- Password: Tiger1SHA12@ (bcryptjs hashed)

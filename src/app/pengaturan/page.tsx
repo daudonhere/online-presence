@@ -537,9 +537,9 @@ export default function PengaturanPage() {
               onChange={(e) => handleProfileChange("location", e.target.value)}
               disabled={loading}
               className="mt-1 w-full bg-transparent text-sm font-bold text-slate-900 outline-none disabled:opacity-50"
-              placeholder="-6.954097, 107.009786"
+              placeholder="-6.954097,107.009786"
             />
-            <p className="mt-1 text-[10px] text-slate-400">Format: -6.954097, 107.009786 (latitude, longitude)</p>
+            <p className="mt-1 text-[10px] text-slate-400">Format: -6.954097,107.009786 (latitude,longitude) — salin dari Google Maps</p>
             {locationMsg && (
               <div className={`mt-2 flex items-center gap-1.5 text-xs font-medium ${locationMsg.type === "success" ? "text-emerald-600" : "text-red-500"}`}>
                 {locationMsg.type === "success" ? <CheckCircle2 className="h-3.5 w-3.5 shrink-0" /> : <AlertCircle className="h-3.5 w-3.5 shrink-0" />}
